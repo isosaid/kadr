@@ -1408,10 +1408,10 @@ el("charts3").addEventListener("click",function(e){
 });
 
 function pickHandler(e){
-  var b=e.target.closest(".bar,.vb,.lg"); if(!b) return;
+  var b=e.target.closest(".bar,.fbar,.vb,.lg"); if(!b) return;
   var k=b.dataset.k, v=b.dataset.v;
   if(!k) return;
-  if(k==="__act"){ setAct(v==="Работают"?"1":"0"); return }
+  if(k==="__act"){ setAct(v==="Работают"?"1":v==="Уволены"?"0":"2"); return }
   if(v===NA || v==="Прочие") return;
   if(k==="gen") v = v==="Мужчины"?"М" : v==="Женщины"?"Ж" : v;
   toggle(k,v);
