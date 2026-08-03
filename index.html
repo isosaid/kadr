@@ -699,9 +699,39 @@ function stAt(p,co){
   if(!co) return stOf(p);
   var evs=coEvents(p,co);
   if(!evs.length) return stOf(p);           /* подстраховка — не должно случаться */
-  var last=evs[evs.length-1];
-  return last[1]===HIRE ? 1 : 0;             /* в этой компании либо ещё работает, либо нет */
+  /* приёмов больше, чем увольнений -> есть непогашенная запись -> работает здесь.
+     Иначе, если увольнения были, -> уволен отсюда (хотя может работать в другой компании) */
+  var hn=0,fn=0,i;
+  for(i=0;i<evs.length;i++){ if(evs[i][1]===HIRE) hn++; else fn++ }
+  if(hn>fn) return 1;
+  if(fn>0) return 0;
+  return stOf(p);
 }
+/* дата приёма именно в этой компании */
+function hdAt(p,co){
+  if(!co) return p.hd;
+  var evs=coEvents(p,co),i,last=null;
+  for(i=0;i<evs.length;i++) if(evs[i][1]===HIRE) last=evs[i][0];
+  return last;
+}
+/* дата увольнения именно из этой компании (null, если здесь ещё работает) */
+function fdAt(p,co){
+  if(!co) return p.fd;
+  if(stAt(p,co)!==0) return null;
+  var evs=coEvents(p,co),i,last=null;
+  for(i=0;i<evs.length;i++) if(evs[i][1]===FIRE) last=evs[i][0];
+  return last;
+}
+/* причина ухода из этой компании */
+function rsnAt(p,co){
+  if(!co) return p.rsn;
+  if(stAt(p,co)!==0) return null;
+  var evs=coEvents(p,co),i,r=null;
+  for(i=0;i<evs.length;i++) if(evs[i][1]===FIRE && evs[i][4]) r=evs[i][4];
+  return r || p.rsn;
+}
+function stKeyAt(p,co){ var v=stAt(p,co); return v===1?"a":v===0?"f":"u" }
+function stLblAt(p,co){ var v=stAt(p,co); return v===1?"работает":v===0?"уволен":"нет дат" }
 function tenAt(p,co){
   if(!co) return p.ten;
   var evs=coEvents(p,co);
@@ -709,8 +739,8 @@ function tenAt(p,co){
   var hires=evs.filter(function(e){return e[1]===HIRE});
   if(!hires.length) return null;
   var hd=hires[hires.length-1][0];
-  var last=evs[evs.length-1];
-  var end=last[1]===FIRE ? last[0] : TODAY;
+  var fd=fdAt(p,co);
+  var end=fd || TODAY;
   var t=Math.round((new Date(end)-new Date(hd))/86400000/365.25*100)/100;
   return t>=0 ? t : null;
 }
@@ -1450,9 +1480,9 @@ function paint(){
       '<div class="mut" title="'+esc(cos(p).join(", "))+'">'+coLabel(p)+'</div>'+
       '<div class="mut" title="'+esc(p.pos)+'">'+esc(p.pos||"—")+'</div>'+
       '<div class="mut">'+esc(p.un||"—")+'</div>'+
-      '<div class="num">'+ru(p.hd)+'</div>'+
-      '<div class="num">'+yrs(p.ten)+'</div>'+
-      '<div><span class="st '+stKey(p)+'">'+stLbl(p)+'</span></div></div>');
+      '<div class="num">'+ru(F.co?hdAt(p,F.co):p.hd)+'</div>'+
+      '<div class="num">'+yrs(F.co?tenAt(p,F.co):p.ten)+'</div>'+
+      '<div><span class="st '+stKeyAt(p,F.co)+'">'+stLblAt(p,F.co)+'</span></div></div>');
   }
   rowsBox.innerHTML=out.join("");
 }
@@ -1464,12 +1494,16 @@ rowsBox.addEventListener("click",function(e){
 /* ============ карточка ============ */
 function openCard(p){
   var list=cos(p);
+  var K=F.co && cos(p).indexOf(F.co)>=0 ? F.co : null;   /* контекст компании */
+  var _hd=K?hdAt(p,K):p.hd, _fd=K?fdAt(p,K):p.fd,
+      _ten=K?tenAt(p,K):p.ten, _rsn=K?rsnAt(p,K):p.rsn;
   var f=[["Подразделение",p.un],["Должность",p.pos],["Руководитель",p.mgr],
          ["Категория",p.cat],["Оформление",p.ctr],["Табельный №",p.tab],["Пол",genN(p)],
          ["Дата рождения",p.bd?ru(p.bd):null],["Возраст",p.age?p.age+" "+plYr(p.age):null],
-         ["Принят",p.hd?ru(p.hd):null],["Уволен",p.fd?ru(p.fd):null],
-         ["Стаж",p.ten!=null?yrs(p.ten)+" "+plYr(p.ten):null],
-         ["Национальность",p.nat],["Причина ухода",p.rsn]];
+         ["Принят"+(K?" ("+K+")":""),_hd?ru(_hd):null],
+         ["Уволен"+(K?" ("+K+")":""),_fd?ru(_fd):null],
+         ["Стаж"+(K?" в «"+K+"»":""),_ten!=null?yrs(_ten)+" "+plYr(_ten):null],
+         ["Национальность",p.nat],["Причина ухода",_rsn]];
   var tl=(p.ev||[]).slice().reverse().map(function(e){
     var hire=e[1]===HIRE;
     return '<li class="'+(hire?"h":"f")+'"><div class="d">'+ru(e[0])+'</div>'+
@@ -1481,10 +1515,14 @@ function openCard(p){
     'Он показан в списке, но не участвует в расчётах и диаграммах.</div></li>';
   el("dbody").innerHTML =
     '<h2>'+esc(p.fio)+'</h2>'+
-    '<div class="sub"><span class="st '+stKey(p)+'">'+stLbl(p)+'</span>'+
+    '<div class="sub"><span class="st '+stKeyAt(p,K)+'">'+stLblAt(p,K)+'</span>'+
+      (K?'<span style="font-size:11.5px;color:var(--ink3)"> &nbsp;в «'+esc(K)+'»</span>':"")+
       (p.pos?" &nbsp;"+esc(p.pos):"")+'</div>'+
     (list.length?'<div class="cotags">'+list.map(function(c){
-        return '<button class="cotag" data-co="'+esc(c)+'">'+esc(c)+'</button>' }).join("")+
+        var sv=stAt(p,c);
+        return '<button class="cotag" data-co="'+esc(c)+'" title="'+
+          (sv===1?"работает здесь":sv===0?"уволен отсюда":"нет дат")+'">'+esc(c)+
+          (sv===0?' <span style="opacity:.55">✕</span>':'')+'</button>' }).join("")+
       (list.length>1?'<span style="font-size:11.5px;color:var(--ink3);align-self:center">работал в '+list.length+' компаниях</span>':"")+'</div>':"")+
     '<dl class="facts">'+f.filter(function(x){return x[1]}).map(function(x){
       return '<div><dt>'+x[0]+'</dt><dd>'+esc(x[1])+'</dd></div>' }).join("")+'</dl>'+
@@ -1517,7 +1555,9 @@ el("csv").addEventListener("click",function(){
   var q=function(v){ v=v==null?"":String(v); return '"'+v.replace(/"/g,'""')+'"' };
   var lines=[head.map(q).join(";")];
   VIEW.forEach(function(p){ lines.push([p.fio,cos(p).join(" | "),p.co,p.un,p.pos,p.mgr,p.cat,p.ctr,p.tab,genN(p),p.bd,p.age,
-    p.hd,p.fd,p.ten,stLbl(p),p.rsn].map(q).join(";")) });
+    F.co?hdAt(p,F.co):p.hd, F.co?fdAt(p,F.co):p.fd,
+    F.co?tenAt(p,F.co):p.ten, stLblAt(p,F.co),
+    F.co?rsnAt(p,F.co):p.rsn].map(q).join(";")) });
   var blob=new Blob([String.fromCharCode(0xFEFF)+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
   var a=document.createElement("a");
   a.href=URL.createObjectURL(blob); a.download="сотрудники.csv"; a.click();
