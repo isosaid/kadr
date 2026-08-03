@@ -660,7 +660,7 @@ function coLabel(p){
   var a=cos(p);
   if(!a.length) return "—";
   if(a.length===1) return esc(a[0]);
-  var cur = p.co||a[a.length-1];
+  var cur = (F.co && a.indexOf(F.co)>=0) ? F.co : (p.co||a[a.length-1]);
   return esc(cur)+'<span class="multi">+'+(a.length-1)+'</span>';
 }
 
@@ -837,8 +837,13 @@ function perBounds(){
 }
 /* человек числился хотя бы один день внутри периода */
 function employedIn(p,a,b){
-  if(p.hd && p.hd>b) return false;
-  if(p.fd && p.fd<a) return false;
+  /* когда выбрана компания — берём её даты, а не общие по холдингу:
+     ушедший отсюда в 2024-м и принятый в другую компанию в 2025-м
+     не должен попадать в среднесписочную численность этой компании */
+  var hd = F.co ? hdAt(p,F.co) : p.hd;
+  var fd = F.co ? fdAt(p,F.co) : p.fd;
+  if(hd && hd>b) return false;
+  if(fd && fd<a) return false;
   return true;
 }
 function sel(skip){ var o=[],i; for(i=0;i<P.length;i++){ if(match(P[i],skip)) o.push(P[i]) } return o }
@@ -1456,9 +1461,14 @@ el("cols").addEventListener("click",function(e){
 });
 function sortView(){
   var k=SORT.k,d=SORT.dir;
+  var rank={1:0,0:1,2:2};                       /* работает → уволен → без дат */
   VIEW.sort(function(a,b){
-    var x=a[k], y=b[k];
+    var x,y;
     if(k==="co"){ x=cos(a)[0]||null; y=cos(b)[0]||null }
+    else if(k==="hd"){ x=F.co?hdAt(a,F.co):a.hd; y=F.co?hdAt(b,F.co):b.hd }
+    else if(k==="ten"){ x=F.co?tenAt(a,F.co):a.ten; y=F.co?tenAt(b,F.co):b.ten }
+    else if(k==="act"){ x=rank[stAt(a,F.co)]; y=rank[stAt(b,F.co)] }
+    else { x=a[k]; y=b[k] }
     if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1;
     if(typeof x==="number") return (x-y)*d;
     return String(x).localeCompare(String(y),"ru")*d;
@@ -1579,7 +1589,7 @@ el("csv").addEventListener("click",function(){
 /* ============ добавление / редактирование сотрудников ============ */
 (function(){
   var modal=el("empModal"); if(!modal) return;
-  var editing=null;
+  var editing=null, editCo=null;   /* editCo — компания, запись по которой правим */
 
   function hid(s){
     var h1=0x811c9dc5>>>0, h2=5381, i, c;
@@ -1600,13 +1610,27 @@ el("csv").addEventListener("click",function(){
 
   function openForm(p){
     editing=p||null;
-    el("empTitle").textContent = p ? "Редактирование сотрудника" : "Новый сотрудник";
+    /* правим запись по выбранной компании; если её нет — по текущей компании человека */
+    editCo = p ? ((F.co && cos(p).indexOf(F.co)>=0) ? F.co : (p.co||cos(p)[0]||null)) : null;
+    el("empTitle").textContent = p
+      ? "Редактирование" + (editCo ? " · "+editCo : "")
+      : "Новый сотрудник";
     el("empDel").hidden = !p;
-    el("empNote").hidden = !(p && (p.ev||[]).length>2);
-    sv("f_fio",p&&p.fio); sv("f_co",p&&p.co); sv("f_un",p&&p.un); sv("f_pos",p&&p.pos);
+    var others = p ? cos(p).filter(function(c){ return c!==editCo }) : [];
+    var deep = p && editCo && coEvents(p,editCo).length>2;
+    var note = el("empNote");
+    note.hidden = !(others.length || deep);
+    note.textContent =
+      (others.length ? "История в других компаниях ("+others.join(", ")+") сохранится — правки касаются только «"+editCo+"». " : "") +
+      (deep ? "В «"+editCo+"» несколько приёмов и увольнений: они будут заменены датами из формы." : "");
+    sv("f_fio",p&&p.fio); sv("f_un",p&&p.un); sv("f_pos",p&&p.pos);
     sv("f_mgr",p&&p.mgr); sv("f_cat",p&&p.cat); sv("f_ctr",p&&p.ctr); sv("f_tab",p&&p.tab);
     el("f_gen").value = p ? (genN(p)||"") : "";
-    sv("f_nat",p&&p.nat); sv("f_bd",p&&p.bd); sv("f_hd",p&&p.hd); sv("f_fd",p&&p.fd); sv("f_rsn",p&&p.rsn);
+    sv("f_nat",p&&p.nat); sv("f_bd",p&&p.bd);
+    sv("f_co", p ? editCo : "");
+    sv("f_hd", p ? hdAt(p,editCo) : "");
+    sv("f_fd", p ? fdAt(p,editCo) : "");
+    sv("f_rsn",p ? rsnAt(p,editCo) : "");
     fillCoList();
     modal.classList.add("on"); modal.setAttribute("aria-hidden","false");
     setTimeout(function(){ el("f_fio").focus() },50);
@@ -1647,20 +1671,37 @@ el("csv").addEventListener("click",function(){
     p.co=co; p.un=fv("f_un")||null; p.pos=pos; p.mgr=fv("f_mgr")||null;
     p.cat=fv("f_cat")||null; p.ctr=fv("f_ctr")||null; p.tab=fv("f_tab")||null;
     p.gen=el("f_gen").value||null; p.nat=fv("f_nat")||null;
-    p.bd=fv("f_bd")||null; p.hd=hd; p.fd=fd; p.rsn=fd?rsn:null;
+    p.bd=fv("f_bd")||null;
 
-    var ev=[];
-    if(hd) ev.push([hd,HIRE,co,pos,null]);
-    if(fd) ev.push([fd,FIRE,co,pos,p.rsn]);
-    p.ev=ev; p.nblank=ev.length?0:1;
+    /* события: заменяем только записи по этой компании (и по старой, если её сменили),
+       всё остальное — история человека в других компаниях — сохраняется */
+    var keep=(p.ev||[]).filter(function(e){ return e[2]!==co && e[2]!==editCo });
+    var mine=[];
+    if(hd) mine.push([hd,HIRE,co,pos,null]);
+    if(fd) mine.push([fd,FIRE,co,pos,rsn]);
+    p.ev=keep.concat(mine).sort(function(a,b){ return a[0]<b[0]?-1:a[0]>b[0]?1:0 });
+    p.nblank=p.ev.length?0:1;
+    delete p._cos; delete p._ce; delete p._h;
 
-    p.st = fd?0 : hd?1 : 2;
+    /* список компаний — из событий, в порядке появления */
+    var seen={}, list=[];
+    p.ev.forEach(function(e){ if(e[2]&&!seen[e[2]]){ seen[e[2]]=1; list.push(e[2]) } });
+    if(co && !seen[co]){ seen[co]=1; list.push(co) }
+    p.cos=list;
+    p.cosa=list.filter(function(c){ return stAt(p,c)===1 });
+    p.co = p.cosa.length ? p.cosa[p.cosa.length-1] : (list.length ? list[list.length-1] : co);
+
+    /* общие поля по холдингу — пересчитываем из итоговой истории */
+    var hires=p.ev.filter(function(e){return e[1]===HIRE}),
+        fires=p.ev.filter(function(e){return e[1]===FIRE});
+    p.hd = hires.length ? hires[hires.length-1][0] : null;
+    p.st = p.cosa.length ? 1 : (p.ev.length ? 0 : 2);
     p.act = p.st===1 ? 1 : 0;
-    p.cos = co?[co]:[];
-    p.cosa = (p.st===1 && co)?[co]:[];
+    p.fd = (p.st===0 && fires.length) ? fires[fires.length-1][0] : null;
+    p.rsn = p.fd ? (fires[fires.length-1][4]||null) : null;
     var ref = TODAY || new Date().toISOString().slice(0,10);
     p.age = p.bd ? Math.floor((new Date(ref)-new Date(p.bd))/31557600000) : null;
-    p.ten = hd ? Math.round((new Date(fd||ref)-new Date(hd))/31557600000*100)/100 : null;
+    p.ten = p.hd ? Math.round((new Date(p.fd||ref)-new Date(p.hd))/31557600000*100)/100 : null;
     if(p.ten!=null && p.ten<0) p.ten=0;
     delete p._cos; delete p._ce; delete p._h;
 
@@ -1671,7 +1712,10 @@ el("csv").addEventListener("click",function(){
 
   function delEmp(){
     if(!editing) return;
-    if(!confirm("Удалить сотрудника «"+editing.fio+"»? Отменить будет нельзя.")) return;
+    var cl=cos(editing);
+    if(!confirm("Удалить «"+editing.fio+"» полностью"+
+       (cl.length>1 ? ", вместе с историей во всех компаниях ("+cl.join(", ")+")" : "")+
+       "? Отменить будет нельзя.")) return;
     var i=P.indexOf(editing);
     if(i>=0) P.splice(i,1);
     if(window.__ALLP && window.__ALLP!==P){
