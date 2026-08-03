@@ -733,6 +733,13 @@ function fdAt(p,co){
   for(i=0;i<evs.length;i++) if(evs[i][1]===FIRE) last=evs[i][0];
   return last;
 }
+/* должность в этой компании — из последнего события с заполненной должностью */
+function posAt(p,co){
+  if(!co) return p.pos;
+  var evs=coEvents(p,co),i,last=null;
+  for(i=0;i<evs.length;i++) if(evs[i][3]) last=evs[i][3];
+  return last || p.pos;
+}
 /* причина ухода из этой компании */
 function rsnAt(p,co){
   if(!co) return p.rsn;
@@ -1510,7 +1517,8 @@ function paint(){
     out.push('<div class="row" data-i="'+i+'" style="position:absolute;top:'+(i*RH)+'px;left:0;right:0">'+
       '<div class="fio" title="'+esc(p.fio)+'">'+esc(p.fio)+'</div>'+
       '<div class="mut" title="'+esc(cos(p).join(", "))+'">'+coLabel(p)+'</div>'+
-      '<div class="mut" title="'+esc(p.pos)+'">'+esc(p.pos||"—")+'</div>'+
+      '<div class="mut" title="'+esc(F.co?posAt(p,F.co):p.pos)+'">'+
+        esc((F.co?posAt(p,F.co):p.pos)||"—")+'</div>'+
       '<div class="mut">'+esc(p.un||"—")+'</div>'+
       '<div class="num">'+ru(F.co?hdAt(p,F.co):p.hd)+'</div>'+
       '<div class="num">'+yrs(F.co?tenAt(p,F.co):p.ten)+'</div>'+
@@ -1538,7 +1546,7 @@ function openCard(p,co){
   CARDCO=K;
   var _hd=K?hdAt(p,K):p.hd, _fd=K?fdAt(p,K):p.fd,
       _ten=K?tenAt(p,K):p.ten, _rsn=K?rsnAt(p,K):p.rsn;
-  var f=[["Подразделение",p.un],["Должность",p.pos],["Руководитель",p.mgr],
+  var f=[["Подразделение",p.un],["Должность"+(K?" ("+K+")":""),K?posAt(p,K):p.pos],["Руководитель",p.mgr],
          ["Категория",p.cat],["Оформление",p.ctr],["Табельный №",p.tab],["Пол",genN(p)],
          ["Дата рождения",p.bd?ru(p.bd):null],["Возраст",p.age?p.age+" "+plYr(p.age):null],
          ["Принят"+(K?" ("+K+")":""),_hd?ru(_hd):null],
@@ -1558,7 +1566,7 @@ function openCard(p,co){
     '<h2>'+esc(p.fio)+'</h2>'+
     '<div class="sub"><span class="st '+stKeyAt(p,K)+'">'+stLblAt(p,K)+'</span>'+
       (K?'<span style="font-size:11.5px;color:var(--ink3)"> &nbsp;в «'+esc(K)+'»</span>':"")+
-      (p.pos?" &nbsp;"+esc(p.pos):"")+'</div>'+
+      ((K?posAt(p,K):p.pos)?" &nbsp;"+esc(K?posAt(p,K):p.pos):"")+'</div>'+
     (list.length>1
       ? '<div class="cotabs">'+
         '<button class="cotab'+(K?"":" on")+'" data-co="__all" title="карьера в группе целиком">'+
@@ -1609,7 +1617,7 @@ el("csv").addEventListener("click",function(){
             "Табельный","Пол","Дата рождения","Возраст","Принят","Уволен","Стаж лет","Статус","Причина"];
   var q=function(v){ v=v==null?"":String(v); return '"'+v.replace(/"/g,'""')+'"' };
   var lines=[head.map(q).join(";")];
-  VIEW.forEach(function(p){ lines.push([p.fio,cos(p).join(" | "),p.co,p.un,p.pos,p.mgr,p.cat,p.ctr,p.tab,genN(p),p.bd,p.age,
+  VIEW.forEach(function(p){ lines.push([p.fio,cos(p).join(" | "),F.co||p.co,p.un,F.co?posAt(p,F.co):p.pos,p.mgr,p.cat,p.ctr,p.tab,genN(p),p.bd,p.age,
     F.co?hdAt(p,F.co):p.hd, F.co?fdAt(p,F.co):p.fd,
     F.co?tenAt(p,F.co):p.ten, stLblAt(p,F.co),
     F.co?rsnAt(p,F.co):p.rsn].map(q).join(";")) });
