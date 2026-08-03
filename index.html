@@ -1079,10 +1079,16 @@ el("chips").addEventListener("click",function(e){
 /* ============ агрегаты ============ */
 function countBy(list,fn){ var m={},i,k; for(i=0;i<list.length;i++){ k=fn(list[i]); if(k==null||k==="") k=NA;
   m[k]=(m[k]||0)+1 } return Object.keys(m).map(function(k){return[k,m[k]]}).sort(function(a,b){return b[1]-a[1]}) }
-function countCompanies(list){ var m={},i,j,a;
-  for(i=0;i<list.length;i++){ a=cos(list[i]);
-    if(!a.length){ m[NA]=(m[NA]||0)+1; continue }
-    for(j=0;j<a.length;j++) m[a[j]]=(m[a[j]]||0)+1 }
+function countCompanies(list){ var m={},i,j,a,p;
+  for(i=0;i<list.length;i++){ p=list[i]; a=cos(p);
+    if(!a.length){ if(F.act===""||F.act==="2") m[NA]=(m[NA]||0)+1; continue }
+    for(j=0;j<a.length;j++){
+      /* человек попадает в компанию, только если его статус ИМЕННО ЗДЕСЬ
+         совпадает с выбранным: уволенный из «А», но работающий в «Б»,
+         не должен считаться действующим в «А» */
+      if(F.act!=="" && String(stAt(p,a[j]))!==F.act) continue;
+      m[a[j]]=(m[a[j]]||0)+1 }
+  }
   return Object.keys(m).map(function(k){return[k,m[k]]}).sort(function(a,b){return b[1]-a[1]}) }
 function orderBy(list,fn,order){ var m={},i,k; for(i=0;i<list.length;i++){ k=fn(list[i]); if(k==null) continue; m[k]=(m[k]||0)+1 }
   return order.filter(function(o){return m[o]}).map(function(o){return[o,m[o]]}) }
@@ -1218,9 +1224,10 @@ function scrollToPicked(host){
 }
 function dashCo(){
   var g=[];
-  g.push(chartCard("Компании","co",countCompanies(sel("co")),0,false,
-    "Все компании. Человек считается в каждой, где он работал.",true));
-  g.push(pieCard("Доля компаний","co",countCompanies(sel("co")),{limit:9999,donut:true,sub:"записей",scroll:true}));
+  var coSrc=countCompanies(sel("co,act"));
+  g.push(chartCard("Компании","co",coSrc,0,false,
+    "Все компании. Статус учитывается по каждой компании отдельно.",true));
+  g.push(pieCard("Доля компаний","co",coSrc,{limit:9999,donut:true,sub:"чел.",scroll:true}));
   el("dashCo").innerHTML=g.filter(Boolean).join("");
   if(F.co) scrollToPicked(el("dashCo"));
 }
