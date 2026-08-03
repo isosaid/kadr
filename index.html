@@ -738,7 +738,18 @@ function posAt(p,co){
   if(!co) return p.pos;
   var evs=coEvents(p,co),i,last=null;
   for(i=0;i<evs.length;i++) if(evs[i][3]) last=evs[i][3];
-  return last || p.pos;
+  return last;                       /* нет записи по этой компании — значит пусто */
+}
+/* Подразделение, руководитель, категория, оформление и табельный в исходных данных
+   хранятся одним значением на человека — по последнему месту работы. Показываем их
+   только на вкладке той компании, к которой они относятся, чтобы не приписывать
+   чужого руководителя другой компании. */
+function homeCo(p){
+  var a=cos(p); if(!a.length) return null;
+  if(p.co && a.indexOf(p.co)>=0) return p.co;
+  var ev=p.ev||[];
+  for(var i=ev.length-1;i>=0;i--) if(ev[i][2]) return ev[i][2];
+  return a[a.length-1];
 }
 /* причина ухода из этой компании */
 function rsnAt(p,co){
@@ -1538,20 +1549,23 @@ function openCard(p,co){
   CARD=p;
   /* контекст: явно выбранная вкладка -> компания из фильтра -> ничего */
   var K;
-  if(co==="__all") K=null;                                   /* вкладка «Все компании» */
-  else if(co && list.indexOf(co)>=0) K=co;                   /* выбранная вкладка */
+  if(co && list.indexOf(co)>=0) K=co;                        /* выбранная вкладка */
   else if(F.co && list.indexOf(F.co)>=0) K=F.co;             /* фильтр дашборда */
   else if(list.length) K=(p.co && list.indexOf(p.co)>=0) ? p.co : list[list.length-1];
   else K=null;
   CARDCO=K;
   var _hd=K?hdAt(p,K):p.hd, _fd=K?fdAt(p,K):p.fd,
       _ten=K?tenAt(p,K):p.ten, _rsn=K?rsnAt(p,K):p.rsn;
-  var f=[["Подразделение",p.un],["Должность"+(K?" ("+K+")":""),K?posAt(p,K):p.pos],["Руководитель",p.mgr],
-         ["Категория",p.cat],["Оформление",p.ctr],["Табельный №",p.tab],["Пол",genN(p)],
+  /* анкетные поля показываем только там, где они действительно записаны */
+  var HC=homeCo(p), own = !K || K===HC, o=function(v){ return own ? v : null };
+  var f=[["Подразделение",o(p.un)],["Должность"+(K?" ("+K+")":""),K?posAt(p,K):p.pos],
+         ["Руководитель",o(p.mgr)],["Категория",o(p.cat)],["Оформление",o(p.ctr)],
+         ["Табельный №",o(p.tab)],["Пол",genN(p)],
          ["Дата рождения",p.bd?ru(p.bd):null],["Возраст",p.age?p.age+" "+plYr(p.age):null],
          ["Принят"+(K?" ("+K+")":""),_hd?ru(_hd):null],
          ["Уволен"+(K?" ("+K+")":""),_fd?ru(_fd):null],
          ["Стаж"+(K?" в «"+K+"»":""),_ten!=null?yrs(_ten)+" "+plYr(_ten):null],
+         ["Стаж в холдинге",p.ten!=null?yrs(p.ten)+" "+plYr(p.ten):null],
          ["Национальность",p.nat],["Причина ухода",_rsn]];
   var tl=(p.ev||[]).slice().reverse().map(function(e){
     var hire=e[1]===HIRE;
@@ -1569,15 +1583,15 @@ function openCard(p,co){
       ((K?posAt(p,K):p.pos)?" &nbsp;"+esc(K?posAt(p,K):p.pos):"")+'</div>'+
     (list.length>1
       ? '<div class="cotabs">'+
-        '<button class="cotab'+(K?"":" on")+'" data-co="__all" title="карьера в группе целиком">'+
-        '<i class="dot u"></i>Все компании</button>'+
         list.map(function(c){
           var sv=stAt(p,c);
           return '<button class="cotab'+(c===K?" on":"")+'" data-co="'+esc(c)+'" title="'+
             (sv===1?"работает здесь":sv===0?"уволен отсюда":"нет дат")+'">'+
             '<i class="dot '+(sv===1?"a":sv===0?"f":"u")+'"></i>'+esc(c)+'</button>' }).join("")+
         '</div><p class="cotab-hint">Работал в '+list.length+' компаниях — переключайте вкладки, '+
-        'чтобы увидеть даты и стаж в каждой. Двойной клик по вкладке — отфильтровать весь дашборд.</p>'
+        'чтобы увидеть даты, должность и стаж в каждой. Двойной клик по вкладке — фильтр по всему дашборду.'+
+        (K&&K!==HC ? ' Подразделение, руководитель, категория и табельный номер в исходных данных '+
+          'заполнены только по «'+esc(HC)+'» — для «'+esc(K)+'» их нет.' : '')+'</p>'
       : (list.length?'<div class="cotags"><button class="cotag" data-co="'+esc(list[0])+'">'+esc(list[0])+'</button></div>':""))+
     '<dl class="facts">'+f.map(function(x){
       return '<div><dt>'+x[0]+'</dt><dd'+(x[1]?'':' class="empty"')+'>'+
@@ -1595,8 +1609,7 @@ el("dbody").addEventListener("click",function(e){
 });
 el("dbody").addEventListener("dblclick",function(e){
   var t=e.target.closest(".cotab"); if(!t) return;
-  F.co = t.dataset.co==="__all" ? null : t.dataset.co;      /* двойной клик — фильтр */
-  closeCard(); render();
+  F.co=t.dataset.co; closeCard(); render();                 /* двойной клик — фильтр */
 });
 function closeCard(){ el("drawer").classList.remove("on"); el("drawer").setAttribute("aria-hidden","true");
   el("scrim").classList.remove("on") }
