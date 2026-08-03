@@ -298,6 +298,16 @@ details.sec .grid{margin-top:0}
 .cotag{background:var(--hire-bg);color:var(--hire);border:0;border-radius:99px;padding:4px 10px;
   font:inherit;font-size:12px;cursor:pointer}
 .cotag:hover{background:var(--hire);color:#fff}
+.cotabs{display:flex;gap:0;flex-wrap:wrap;margin-bottom:12px;border-bottom:1px solid var(--line)}
+.cotab{background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;
+  padding:7px 12px;font:inherit;font-size:12.5px;color:var(--ink2);cursor:pointer;
+  display:flex;align-items:center;gap:6px}
+.cotab:hover{color:var(--ink)}
+.cotab.on{color:var(--ink);border-bottom-color:var(--hire);font-weight:600}
+.cotab .dot{width:7px;height:7px;border-radius:99px;background:var(--hire);flex:none}
+.cotab .dot.f{background:var(--fire)}
+.cotab .dot.u{background:var(--ink3)}
+.cotab-hint{font-size:11.5px;color:var(--ink3);margin:-6px 0 12px}
 .facts{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
   border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:18px}
 .facts div{background:var(--surface);padding:9px 11px;min-width:0}
@@ -1514,9 +1524,18 @@ rowsBox.addEventListener("click",function(e){
 });
 
 /* ============ карточка ============ */
-function openCard(p){
+var CARD=null, CARDCO=null;      /* кто открыт и в контексте какой компании */
+function openCard(p,co){
   var list=cos(p);
-  var K=F.co && cos(p).indexOf(F.co)>=0 ? F.co : null;   /* контекст компании */
+  CARD=p;
+  /* контекст: явно выбранная вкладка -> компания из фильтра -> ничего */
+  var K;
+  if(co==="__all") K=null;                                   /* вкладка «Все компании» */
+  else if(co && list.indexOf(co)>=0) K=co;                   /* выбранная вкладка */
+  else if(F.co && list.indexOf(F.co)>=0) K=F.co;             /* фильтр дашборда */
+  else if(list.length) K=(p.co && list.indexOf(p.co)>=0) ? p.co : list[list.length-1];
+  else K=null;
+  CARDCO=K;
   var _hd=K?hdAt(p,K):p.hd, _fd=K?fdAt(p,K):p.fd,
       _ten=K?tenAt(p,K):p.ten, _rsn=K?rsnAt(p,K):p.rsn;
   var f=[["Подразделение",p.un],["Должность",p.pos],["Руководитель",p.mgr],
@@ -1540,12 +1559,18 @@ function openCard(p){
     '<div class="sub"><span class="st '+stKeyAt(p,K)+'">'+stLblAt(p,K)+'</span>'+
       (K?'<span style="font-size:11.5px;color:var(--ink3)"> &nbsp;в «'+esc(K)+'»</span>':"")+
       (p.pos?" &nbsp;"+esc(p.pos):"")+'</div>'+
-    (list.length?'<div class="cotags">'+list.map(function(c){
-        var sv=stAt(p,c);
-        return '<button class="cotag" data-co="'+esc(c)+'" title="'+
-          (sv===1?"работает здесь":sv===0?"уволен отсюда":"нет дат")+'">'+esc(c)+
-          (sv===0?' <span style="opacity:.55">✕</span>':'')+'</button>' }).join("")+
-      (list.length>1?'<span style="font-size:11.5px;color:var(--ink3);align-self:center">работал в '+list.length+' компаниях</span>':"")+'</div>':"")+
+    (list.length>1
+      ? '<div class="cotabs">'+
+        '<button class="cotab'+(K?"":" on")+'" data-co="__all" title="карьера в группе целиком">'+
+        '<i class="dot u"></i>Все компании</button>'+
+        list.map(function(c){
+          var sv=stAt(p,c);
+          return '<button class="cotab'+(c===K?" on":"")+'" data-co="'+esc(c)+'" title="'+
+            (sv===1?"работает здесь":sv===0?"уволен отсюда":"нет дат")+'">'+
+            '<i class="dot '+(sv===1?"a":sv===0?"f":"u")+'"></i>'+esc(c)+'</button>' }).join("")+
+        '</div><p class="cotab-hint">Работал в '+list.length+' компаниях — переключайте вкладки, '+
+        'чтобы увидеть даты и стаж в каждой. Двойной клик по вкладке — отфильтровать весь дашборд.</p>'
+      : (list.length?'<div class="cotags"><button class="cotag" data-co="'+esc(list[0])+'">'+esc(list[0])+'</button></div>':""))+
     '<dl class="facts">'+f.map(function(x){
       return '<div><dt>'+x[0]+'</dt><dd'+(x[1]?'':' class="empty"')+'>'+
         (x[1]?esc(x[1]):"—")+'</dd></div>' }).join("")+'</dl>'+
@@ -1555,8 +1580,15 @@ function openCard(p){
   el("scrim").classList.add("on");
 }
 el("dbody").addEventListener("click",function(e){
+  var t=e.target.closest(".cotab");
+  if(t){ if(CARD) openCard(CARD,t.dataset.co); return }     /* переключить вкладку */
   var b=e.target.closest(".cotag"); if(!b) return;
-  F.co=b.dataset.co; closeCard(); render();
+  F.co=b.dataset.co; closeCard(); render();                 /* один тег — сразу фильтр */
+});
+el("dbody").addEventListener("dblclick",function(e){
+  var t=e.target.closest(".cotab"); if(!t) return;
+  F.co = t.dataset.co==="__all" ? null : t.dataset.co;      /* двойной клик — фильтр */
+  closeCard(); render();
 });
 function closeCard(){ el("drawer").classList.remove("on"); el("drawer").setAttribute("aria-hidden","true");
   el("scrim").classList.remove("on") }
@@ -1709,7 +1741,7 @@ el("csv").addEventListener("click",function(){
 
     refreshAll();
     closeForm();
-    if(typeof openCard==="function") openCard(p);
+    if(typeof openCard==="function") openCard(p,co);
   }
 
   function delEmp(){
