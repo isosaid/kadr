@@ -1053,7 +1053,7 @@ function kpisX(){
 function chips(){
   var out=[], other=0;
   /* статус показываем всегда — чтобы было видно, что список отфильтрован по умолчанию */
-  out.push(chip("act","Статус", F.act==="1"?"Действующие":F.act==="0"?"Уволенные":"Все"));
+  out.push(chip("act","Статус", F.act==="1"?"Действующие":F.act==="0"?"Уволенные":F.act==="2"?"Без дат":"Все"));
   if(F.q) out.push(chip("q","Поиск",F.q));
   ["co","un","cat","ctr","gen","mgr","pos","age","ten"].forEach(function(k){ if(F[k]) out.push(chip(k,LBL[k],F[k])) });
   if(F.mon||F.yr) out.push(chip("per","Период",perLbl()));
@@ -1101,15 +1101,18 @@ function chartCard(title,key,rows,limit,warm,hint,scroll){
     max=Math.max.apply(null,rows.slice(0,limit).map(function(r){return r[1]}));
     shown=rows.slice(0,limit); more='<div class="more">+ ещё '+(rows.length-limit)+' — уточните поиском</div>';
   }
+  if(F[key] && !rows.some(function(r){return r[0]===F[key]}))
+    shown=[[F[key],0]].concat(shown);
   var body=shown.map(function(r){
-    var w=Math.max(1,Math.round(r[1]/max*100));
+    var w=r[1]?Math.max(1,Math.round(r[1]/max*100)):0;
     return '<button class="bar'+(warm?" warm":"")+(F[key]===r[0]?" on":"")+'" data-k="'+key+'" data-v="'+esc(r[0])+'">'+
       '<span class="nm" title="'+esc(r[0])+'">'+esc(r[0])+'</span>'+
       '<span class="track"><span class="fill" style="width:'+w+'%"></span></span>'+
       '<span class="ct">'+n(r[1])+'</span></button>';
   }).join("");
   return '<div class="card"><h3>'+title+'</h3>'+(hint?'<p class="hint">'+hint+'</p>':'')+
-         (F[key]?'<p class="picked">Выбрано: '+esc(F[key])+'</p>':'')+
+         (F[key]?'<p class="picked">Выбрано: '+esc(F[key])+
+            (rows.some(function(r){return r[0]===F[key]})?'':' — здесь никого нет')+'</p>':'')+
          '<div class="bars'+(scroll&&shown.length>12?" scroll":"")+'">'+body+'</div>'+more+'</div>';
 }
 
@@ -1170,8 +1173,8 @@ function pieCard(title,key,rows,opt){
     /* если что-то выбрано — в центре показываем выбранное, а не общий итог */
     var selRow=null;
     if(picked) shown.forEach(function(r){ if(r[0]===picked) selRow=r });
-    var big = selRow? n(selRow[1]) : n(tot);
-    var sub = selRow? "из "+n(tot)+" "+(opt.sub||"") : (opt.sub||"чел.");
+    var big = picked? n(selRow?selRow[1]:0) : n(tot);
+    var sub = picked? "из "+n(tot)+" "+(opt.sub||"") : (opt.sub||"чел.");
     var fs = big.length>6? 15 : big.length>4? 17 : 19;
     svg.push('<text class="pie-c" x="'+cx+'" y="'+(cy-1)+'" text-anchor="middle" font-size="'+fs+'">'+big+'</text>');
     svg.push('<text class="pie-s" x="'+cx+'" y="'+(cy+14)+'" text-anchor="middle" font-size="9">'+esc(sub)+'</text>');
@@ -1185,7 +1188,8 @@ function pieCard(title,key,rows,opt){
       '<span class="p">'+n(r[1])+' · '+pct(r[1],tot)+'%</span></button>';
   }).join("");
   return '<div class="card"><h3>'+title+'</h3>'+(opt.hint?'<p class="hint">'+opt.hint+'</p>':'')+
-    (picked?'<p class="picked">Выбрано: '+esc(picked)+'</p>':'')+
+    (picked?'<p class="picked">Выбрано: '+esc(picked)+
+       (rows.some(function(r){return r[0]===picked})?'':' — здесь никого нет')+'</p>':'')+
     '<div class="pie-wrap"><svg width="'+S+'" height="'+S+'" viewBox="0 0 '+S+' '+S+'">'+svg.join("")+'</svg>'+
     '<div class="legend'+(opt.scroll?" scroll":"")+'">'+leg+'</div></div></div>';
 }
