@@ -15,9 +15,29 @@ const USERS = {"iso@avesto.tj":{"h":"817df3b5738ed0a2ead7a8ee7e3f2e29950501db51d
 const KEY  = "hr:logins";
 const KEEP = 2000;                       // сколько последних записей хранить
 
+/* Ищем адрес и токен хранилища, не завися от того, какие имена дала интеграция:
+   KV_REST_API_URL, UPSTASH_REDIS_REST_URL, STORAGE_URL — подойдёт любое. */
+function creds() {
+  const env = process.env;
+  let url = env.KV_REST_API_URL || env.UPSTASH_REDIS_REST_URL || null;
+  let token = env.KV_REST_API_TOKEN || env.UPSTASH_REDIS_REST_TOKEN || null;
+  if (url && token) return { url, token };
+
+  for (const k of Object.keys(env)) {
+    const v = env[k];
+    if (!v || !/^https:\/\//.test(v) || !/upstash\.io/.test(v)) continue;
+    if (!/URL$/.test(k)) continue;
+    const base = k.replace(/URL$/, "");
+    const tk = Object.keys(env).find(
+      (x) => x.startsWith(base) && /TOKEN$/.test(x) && env[x]
+    );
+    if (tk) return { url: v, token: env[tk] };
+  }
+  return { url, token };
+}
+
 function store() {
-  const url   = process.env.KV_REST_API_URL   || process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  const { url, token } = creds();
   if (!url || !token) return null;
   return async (cmd) => {
     const r = await fetch(url, {
