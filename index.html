@@ -2459,10 +2459,26 @@ function device(){
          : /Safari\//.test(u)?"Safari" : "—";
   return os+" · "+br;
 }
-function logLogin(email,admin){
+function logLogin(email,admin,hash){
   var a=lread();
   a.push({e:email, a:admin?1:0, t:new Date().toISOString(), d:device()});
-  lwrite(a);
+  lwrite(a);                                  /* локальная копия — на случай, если сервера нет */
+  try{ api("record",{email:email,hash:hash,device:device()})
+        .catch(function(){}); }catch(e){}      /* и в общую базу; сбой не мешает входу */
+}
+/* обращение к серверному журналу; молча отваливается на офлайн-файле */
+function api(action,extra){
+  if(location.protocol==="file:" || typeof fetch!=="function")
+    return Promise.reject(new Error("offline"));
+  var body={action:action};
+  for(var k in extra) body[k]=extra[k];
+  return fetch("/api/logins",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(body)}).then(function(r){
+      return r.json().then(function(j){
+        if(!r.ok) throw new Error(j.error||("HTTP "+r.status));
+        return j;
+      });
+    });
 }
 function fmt(iso){
   var d=new Date(iso);
@@ -2472,18 +2488,30 @@ function fmt(iso){
 function esc2(s){ return String(s==null?"":s)
   .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;") }
 
-function renderLog(){
-  var all=lread().slice().reverse();
-  var mine = (CUR && !CUR.admin) ? all.filter(function(x){ return x.e===CUR.email }) : all;
+var LOGVIEW=[], LOGSRC="local";
+function paint(){
   var tb=document.getElementById("logRows"), em=document.getElementById("logEmpty");
-  tb.innerHTML = mine.map(function(x){
+  tb.innerHTML = LOGVIEW.map(function(x){
     return '<tr><td>'+fmt(x.t)+'</td><td class="who">'+esc2(x.e)+
-      (x.a?'<span class="adm">админ</span>':'')+'</td><td>'+esc2(x.d||"—")+'</td></tr>' }).join("");
-  em.hidden = mine.length>0;
-  document.getElementById("logSub").textContent =
-    (CUR && CUR.admin ? "Все входы, сделанные в этом браузере" : "Ваши входы в этом браузере")+
-    " · записей: "+mine.length;
-  document.getElementById("logClear").hidden = !(CUR && CUR.admin) || !all.length;
+      (x.a?'<span class="adm">админ</span>':'')+'</td><td>'+esc2(x.d||"—")+
+      (x.i?'<span style="color:var(--ink3)"> · '+esc2(x.i)+'</span>':'')+'</td></tr>' }).join("");
+  em.hidden = LOGVIEW.length>0;
+  var scope = (CUR && CUR.admin) ? "Все пользователи" : "Только ваши входы";
+  var where = LOGSRC==="server" ? "общая база — входы со всех компьютеров"
+            : LOGSRC==="wait"   ? "загрузка…"
+            : "только этот браузер (общая база недоступна)";
+  document.getElementById("logSub").textContent = scope+" · "+where+" · записей: "+LOGVIEW.length;
+  document.getElementById("logClear").hidden = !(CUR && CUR.admin) || !LOGVIEW.length;
+}
+function localView(){
+  var all=lread().slice().reverse();
+  return (CUR && !CUR.admin) ? all.filter(function(x){ return x.e===CUR.email }) : all;
+}
+function renderLog(){
+  LOGVIEW=localView(); LOGSRC="wait"; paint();
+  api("list",{email:CUR.email,hash:CUR.hash}).then(function(j){
+    LOGVIEW=j.items||[]; LOGSRC="server"; paint();
+  }).catch(function(){ LOGVIEW=localView(); LOGSRC="local"; paint() });
 }
 function openLog(){
   renderLog();
@@ -2499,8 +2527,8 @@ function login(email,hash,save){
   var u=USERS[email];
   if(!u || u.h!==hash) return false;
   if(save){ try{ sessionStorage.setItem("hr_auth", email+"|"+hash) }catch(e){} }
-  CUR={email:email, admin:!!u.a};
-  if(save) logLogin(email,u.a);          /* пишем только реальный вход, не восстановление вкладки */
+  CUR={email:email, admin:!!u.a, hash:hash};
+  if(save) logLogin(email,u.a,hash);     /* пишем только реальный вход, не восстановление вкладки */
   box.classList.add("off"); box.setAttribute("aria-hidden","true");
   if(window.__setUser) window.__setUser({email:email, admin:!!u.a, companies:u.c||[]});
   return true;
@@ -2525,11 +2553,9 @@ document.addEventListener("keydown",function(e){
   if(e.key==="Escape") closeLog();
 });
 document.getElementById("logCsv").addEventListener("click",function(){
-  var all=lread().slice().reverse();
-  var mine=(CUR && !CUR.admin) ? all.filter(function(x){ return x.e===CUR.email }) : all;
   var q=function(v){ v=v==null?"":String(v); return '"'+v.replace(/"/g,'""')+'"' };
-  var lines=[["Когда","Пользователь","Роль","Устройство"].map(q).join(";")];
-  mine.forEach(function(x){ lines.push([fmt(x.t),x.e,x.a?"админ":"пользователь",x.d||""].map(q).join(";")) });
+  var lines=[["Когда","Пользователь","Роль","Устройство","IP"].map(q).join(";")];
+  LOGVIEW.forEach(function(x){ lines.push([fmt(x.t),x.e,x.a?"админ":"пользователь",x.d||"",x.i||""].map(q).join(";")) });
   var blob=new Blob([String.fromCharCode(0xFEFF)+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
   var a=document.createElement("a");
   a.href=URL.createObjectURL(blob); a.download="история-входа.csv";
@@ -2538,7 +2564,8 @@ document.getElementById("logCsv").addEventListener("click",function(){
 });
 document.getElementById("logClear").addEventListener("click",function(){
   if(!CUR || !CUR.admin) return;
-  if(!confirm("Очистить историю входа в этом браузере? Отменить будет нельзя.")) return;
+  if(!confirm("Очистить локальную копию журнала в этом браузере?\n"+
+     "Записи в общей базе останутся.")) return;
   lwrite([]); renderLog();
 });
 
