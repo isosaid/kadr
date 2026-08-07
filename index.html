@@ -861,16 +861,46 @@ function inYear(p,y){
   for(var i=0;i<p.ev.length;i++){ var d=p.ev[i][0]; if(d && d.slice(0,4)===y) return true }
   return false;
 }
+/* статус человека НА ДАТУ: считаем только события до этой даты включительно.
+   Нужен для отчётов по месяцам: «действующие за июль» — это те, кто числился
+   на конец июля, а не те, кого приняли в июле. */
+function stAsOf(p,co,end){
+  var evs = co ? coEvents(p,co) : (p.ev||[]);
+  var h=0,f=0,i;
+  for(i=0;i<evs.length;i++){
+    if(evs[i][0] > end) continue;
+    if(evs[i][1]===HIRE) h++; else f++;
+  }
+  if(!h && !f) return 2;
+  return h>f ? 1 : 0;
+}
+/* попадает ли человек в выбранный период — с учётом того, что именно спросили */
+function inPeriodByStatus(p,kco,act){
+  var b=perBounds();
+  var evs = kco ? coEvents(p,kco) : (p.ev||[]);
+  if(!evs.length) return false;                 /* без дат — вне любого периода */
+  if(act==="0"){                                /* уволенные: ушли внутри периода */
+    for(var i=0;i<evs.length;i++)
+      if(evs[i][1]===FIRE && evs[i][0]>=b[0] && evs[i][0]<=b[1]) return true;
+    return false;
+  }
+  if(act==="1") return stAsOf(p,kco,b[1])===1;  /* действующие: числились на конец периода */
+  return employedIn(p,b[0],b[1],kco);           /* остальное: работали хотя бы день */
+}
+
 /* skip — какой фильтр не применять: "co", либо несколько: "act,mon" */
 function match(p,skip){
   var sk = skip ? ","+skip+"," : "";
   var no = function(k){ return sk && sk.indexOf(","+k+",")>=0 };
   if(F.q && hay(p).indexOf(F.q)<0) return false;
-  if(F.act!==""){
-    if(!no("act")){
-      /* компания выбрана -> статус считаем В НЕЙ, не глобально: человек,
-         уволенный из этой компании, но работающий в другой, сюда не попадает */
-      var coCtx = (F.co && !no("co")) ? F.co : null;
+  /* компания выбрана -> статус считаем В НЕЙ, не глобально: человек,
+     уволенный из этой компании, но работающий в другой, сюда не попадает */
+  var coCtx = (F.co && !no("co")) ? F.co : null;
+  var perOn = (F.mon || F.yr) && !no("mon");
+  if(F.act!=="" && !no("act")){
+    /* с выбранным периодом статус проверяется на конец периода (см. inPeriodByStatus),
+       здесь остаётся только «без дат» */
+    if(!perOn || F.act==="2"){
       if(String(stAt(p,coCtx))!==F.act) return false;
     }
   }
@@ -887,9 +917,8 @@ function match(p,skip){
     var coCtx2 = (F.co && !no("co")) ? F.co : null;
     if(tenBAt(p,coCtx2)!==F.ten) return false;
   }
-  if(!no("mon")){
-    if(F.mon){ if(!inMonth(p,F.mon)) return false }
-    else if(F.yr){ if(!inYear(p,F.yr)) return false }
+  if(perOn && F.act!=="2"){
+    if(!inPeriodByStatus(p,coCtx,no("act") ? "" : F.act)) return false;
   }
   return true;
 }
@@ -912,12 +941,13 @@ function perBounds(){
   return ["0000-01-01","9999-12-31"];
 }
 /* человек числился хотя бы один день внутри периода */
-function employedIn(p,a,b){
+function employedIn(p,a,b,kco){
   /* когда выбрана компания — берём её даты, а не общие по холдингу:
      ушедший отсюда в 2024-м и принятый в другую компанию в 2025-м
      не должен попадать в среднесписочную численность этой компании */
-  var hd = F.co ? hdAt(p,F.co) : p.hd;
-  var fd = F.co ? fdAt(p,F.co) : p.fd;
+  if(kco===undefined) kco=F.co||null;
+  var hd = kco ? hdAt(p,kco) : p.hd;
+  var fd = kco ? fdAt(p,kco) : p.fd;
   if(hd && hd>b) return false;
   if(fd && fd<a) return false;
   return true;
@@ -1280,7 +1310,12 @@ function dash(){
   var h=[];
   /* показываем ровно то, что выбрано переключателем Действующие/Уволенные/Все */
   var actN=0,firN=0,nadN=0,i,v;
-  for(i=0;i<VIEW.length;i++){ v=stAt(VIEW[i],F.co); if(v===1) actN++; else if(v===0) firN++; else nadN++ }
+  /* с выбранным периодом статус тоже берём на его конец */
+  var _end=(F.mon||F.yr)?perBounds()[1]:null;
+  for(i=0;i<VIEW.length;i++){
+    v=_end ? stAsOf(VIEW[i],F.co,_end) : stAt(VIEW[i],F.co);
+    if(v===1) actN++; else if(v===0) firN++; else nadN++;
+  }
   var st=[["Работают",actN],["Уволены",firN],["Без дат",nadN]].filter(function(r){return r[1]});
   var stCol = (F.act==="0") ? ["#B0452A","#0B7A66","#98A4AB"] : ["#0B7A66","#B0452A","#98A4AB"];
   h.push(pieCard("Статус штата","__act",st,
