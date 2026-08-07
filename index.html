@@ -1721,46 +1721,53 @@ el("csv").addEventListener("click",function(){
   var X = window.XLSX;
   if(!X){ alert("Модуль Excel ещё загружается — попробуйте через пару секунд."); return }
 
-  /* заголовки — как в исходных таблицах кадров, на таджикском */
-  var head=["НОМУ НАСАБ","ЛОИҲА","СОХТОР","ВАЗИФА","САРДОРИ БЕВОСИТА","КАТЕГОРИЯ","ТИП",
-            "РАҚАМИ ТАБЕЛӢ","ҶИНС","САНАИ ТАВАЛЛУД","СИНН","САНАИ ҚАБУЛ","САНАИ ХОРИҶ",
-            "ҲОЛАТ","САБАБИ АЗ КОР РАФТАН"];
-  var stTj=function(p){ var v=stAt(p,F.co);
-    return v===1?"Кор мекунад" : v===0?"Хориҷ шудааст" : "Сана нест" };
+  /* формат совпадает со столбцами main.xlsx (лист «Данные»): одна строка = одно
+     кадровое событие. Такой файл можно вставлять прямо в main или использовать
+     как исходник для скрипта сборки. */
+  var head=["Дата","Рӯйдод","ЛОИҲА","РАҚАМИ ТАБЕЛӢ","КАТЕГОРИЯ","ТИП","НАСАБ","НОМ",
+            "НОМИ ПАДАР","ВАЗИФА","СОХТОР","САРДОРИ БЕВОСИТА","САНАИ ТАВАЛЛУД",
+            "САБАБИ АЗ КОР РАФТАН","ҶИНС","МИЛЛАТ","СУРОҒА","РАҚАМИ ТЕЛЕФОН","ЭЗОҲ"];
   var dt=function(s){                       /* «2026-07-30» -> настоящая дата Excel */
     if(!s) return null;
     var a=s.split("-");
     return a.length===3 ? new Date(+a[0], +a[1]-1, +a[2]) : null;
   };
+  /* НОМ и НОМИ ПАДАР по отдельности не хранятся — делим остаток ФИО после фамилии */
+  var splitName=function(p){
+    var rest=(p.fio||"").slice((p.ln||"").length).trim().split(/\s+/).filter(Boolean);
+    return [rest[0]||"", rest.slice(1).join(" ")||""];
+  };
 
   var aoa=[head];
   VIEW.forEach(function(p){
-    aoa.push([ p.fio, F.co||p.co, unAt(p,F.co), F.co?posAt(p,F.co):p.pos, mgrAt(p,F.co),
-      catAt(p,F.co), ctrAt(p,F.co), tabAt(p,F.co), genN(p),
-      dt(p.bd), p.age,
-      dt(F.co?hdAt(p,F.co):p.hd), dt(F.co?fdAt(p,F.co):p.fd),
-      stTj(p), F.co?rsnAt(p,F.co):p.rsn ]);
+    var nm=splitName(p);
+    (p.ev||[]).forEach(function(e){
+      var co=e[2];
+      if(F.co && co!==F.co) return;          /* уважаем выбранную компанию */
+      aoa.push([ dt(e[0]), e[1], co, tabAt(p,co), catAt(p,co), ctrAt(p,co),
+        p.ln, nm[0], nm[1], e[3]||posAt(p,co), unAt(p,co), mgrAt(p,co),
+        dt(p.bd), e[4]||null, genN(p), p.nat, null, null, null ]);
+    });
   });
 
   var ws=X.utils.aoa_to_sheet(aoa,{cellDates:true});
-  /* формат дат и ширина столбцов */
   var lastRow=aoa.length;
-  [9,11,12].forEach(function(c){                 /* САНАИ ТАВАЛЛУД, ҚАБУЛ, ХОРИҶ */
+  [0,12].forEach(function(c){                 /* Дата, САНАИ ТАВАЛЛУД */
     for(var r=1;r<lastRow;r++){
       var ref=X.utils.encode_cell({c:c,r:r}), cell=ws[ref];
       if(cell && cell.t==="d") cell.z="dd.mm.yyyy";
     }
   });
-  ws["!cols"]=[{wch:34},{wch:18},{wch:26},{wch:28},{wch:24},{wch:14},{wch:10},
-               {wch:12},{wch:6},{wch:13},{wch:7},{wch:13},{wch:13},{wch:15},{wch:26}];
+  ws["!cols"]=[{wch:12},{wch:9},{wch:16},{wch:12},{wch:12},{wch:10},{wch:20},{wch:16},
+               {wch:20},{wch:26},{wch:22},{wch:22},{wch:13},{wch:22},{wch:6},{wch:12},
+               {wch:16},{wch:14},{wch:16}];
   ws["!autofilter"]={ref:X.utils.encode_range({s:{c:0,r:0},e:{c:head.length-1,r:lastRow-1}})};
   ws["!freeze"]={xSplit:0,ySplit:1};
 
   var wb=X.utils.book_new();
-  X.utils.book_append_sheet(wb,ws,"Кормандон");
+  X.utils.book_append_sheet(wb,ws,"Данные");
   var d=new Date(), p2=function(n){return (n<10?"0":"")+n};
-  var name="Кормандон_"+d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+".xlsx";
-  /* собираем файл сами и отдаём ссылкой — так же, как остальные выгрузки */
+  var name="Данные_"+d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+".xlsx";
   var out=X.write(wb,{bookType:"xlsx",type:"array"});
   var blob=new Blob([out],
     {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
