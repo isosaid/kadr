@@ -100,7 +100,10 @@ body{
 .kpi .v.up{color:var(--hire)} .kpi .v.dn{color:var(--fire)}
 
 /* ---------- filter chips ---------- */
-.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px;align-items:center;min-height:26px}
+.chips{display:flex;gap:7px;flex-wrap:wrap;align-items:center;min-height:26px;flex:1 1 auto}
+.cosel-box.flt{border-color:var(--line);color:var(--ink2)}
+.cosel-box.flt label{cursor:default}
+#chipsRow{align-items:flex-start}
 .chips .none{font-size:12px;color:var(--ink3)}
 .chip{display:inline-flex;align-items:center;gap:7px;background:var(--ink);color:#fff;
   border:0;padding:5px 8px 5px 10px;border-radius:var(--r);font:inherit;font-size:12px;cursor:pointer;
@@ -482,13 +485,21 @@ body.loaded #loadReopen{display:inline-block}
     </div>
     <div class="copills" id="mopills"></div>
   </div>
+  <div class="cobar-in" id="chipsRow">
+    <div class="cosel-box flt">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+        <path d="M3 5h18l-7 8v6l-4 2v-8z" stroke-linejoin="round"/>
+      </svg>
+      <label>Отбор</label>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
 </div>
 
 <div class="wrap">
   <div id="app" hidden>
 
     <div class="lbl"><b id="scopeName">Все компании</b> · <span id="scopePer">весь период</span> · сводка</div>
-    <div class="chips" id="chips"></div>
 
     <div class="lbl">Компании</div>
     <div class="grid" id="dashCo"></div>
