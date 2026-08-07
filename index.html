@@ -727,6 +727,8 @@ function coLabel(p){
 /* ============ пол: м/М и ж/Ж/з/З — одно и то же ============ */
 var GEN_M={"М":1,"M":1,"МУЖ":1,"МУЖСКОЙ":1,"МАРД":1},
     GEN_F={"Ж":1,"З":1,"J":1,"ЖЕН":1,"ЖЕНСКИЙ":1,"ЗАН":1};
+/* для выгрузки в исходный формат: пол по конвенции main.xlsx (М / З, не Ж) */
+function genSrc(p){ return genN(p)==="Ж" ? "З" : genN(p); }
 function genN(p){
   var g=p&&p.gen; if(g==null) return null;
   var s=String(g).trim().toUpperCase();
@@ -1746,7 +1748,7 @@ el("csv").addEventListener("click",function(){
       if(F.co && co!==F.co) return;          /* уважаем выбранную компанию */
       aoa.push([ dt(e[0]), e[1], co, tabAt(p,co), catAt(p,co), ctrAt(p,co),
         p.ln, nm[0], nm[1], e[3]||posAt(p,co), unAt(p,co), mgrAt(p,co),
-        dt(p.bd), e[4]||null, genN(p), p.nat, null, null, null ]);
+        dt(p.bd), e[4]||null, genSrc(p), p.nat, null, null, null ]);
     });
   });
 
