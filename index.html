@@ -459,7 +459,7 @@ body.loaded #loadReopen{display:inline-block}
     <button class="btn" id="empAdd">+ Сотрудник</button>
     <button class="btn" id="logHist" title="Кто и когда входил в дашборд">История входа</button>
     <button class="btn" id="loadReopen">Загрузить файл</button>
-    <button class="btn" id="csv">Скачать CSV</button>
+    <button class="btn" id="csv">Скачать Excel</button>
     <button class="btn" id="logoutBtn" title="Сменить пользователя">Выйти</button>
   </div>
 </div>
@@ -1718,18 +1718,56 @@ el("statseg").addEventListener("click",function(e){
   var b=e.target.closest("button"); if(!b) return; setAct(b.dataset.act);
 });
 el("csv").addEventListener("click",function(){
-  var head=["ФИО","Компании","Текущая компания","Подразделение","Должность","Руководитель","Категория","Оформление",
-            "Табельный","Пол","Дата рождения","Возраст","Принят","Уволен","Стаж лет","Статус","Причина"];
-  var q=function(v){ v=v==null?"":String(v); return '"'+v.replace(/"/g,'""')+'"' };
-  var lines=[head.map(q).join(";")];
-  VIEW.forEach(function(p){ lines.push([p.fio,cos(p).join(" | "),F.co||p.co,unAt(p,F.co),F.co?posAt(p,F.co):p.pos,mgrAt(p,F.co),catAt(p,F.co),ctrAt(p,F.co),tabAt(p,F.co),genN(p),p.bd,p.age,
-    F.co?hdAt(p,F.co):p.hd, F.co?fdAt(p,F.co):p.fd,
-    F.co?tenAt(p,F.co):p.ten, stLblAt(p,F.co),
-    F.co?rsnAt(p,F.co):p.rsn].map(q).join(";")) });
-  var blob=new Blob([String.fromCharCode(0xFEFF)+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
+  var X = window.XLSX;
+  if(!X){ alert("Модуль Excel ещё загружается — попробуйте через пару секунд."); return }
+
+  /* заголовки — как в исходных таблицах кадров, на таджикском */
+  var head=["НОМУ НАСАБ","ЛОИҲА","СОХТОР","ВАЗИФА","САРДОРИ БЕВОСИТА","КАТЕГОРИЯ","ТИП",
+            "РАҚАМИ ТАБЕЛӢ","ҶИНС","САНАИ ТАВАЛЛУД","СИНН","САНАИ ҚАБУЛ","САНАИ ХОРИҶ",
+            "ҲОЛАТ","САБАБИ АЗ КОР РАФТАН"];
+  var stTj=function(p){ var v=stAt(p,F.co);
+    return v===1?"Кор мекунад" : v===0?"Хориҷ шудааст" : "Сана нест" };
+  var dt=function(s){                       /* «2026-07-30» -> настоящая дата Excel */
+    if(!s) return null;
+    var a=s.split("-");
+    return a.length===3 ? new Date(+a[0], +a[1]-1, +a[2]) : null;
+  };
+
+  var aoa=[head];
+  VIEW.forEach(function(p){
+    aoa.push([ p.fio, F.co||p.co, unAt(p,F.co), F.co?posAt(p,F.co):p.pos, mgrAt(p,F.co),
+      catAt(p,F.co), ctrAt(p,F.co), tabAt(p,F.co), genN(p),
+      dt(p.bd), p.age,
+      dt(F.co?hdAt(p,F.co):p.hd), dt(F.co?fdAt(p,F.co):p.fd),
+      stTj(p), F.co?rsnAt(p,F.co):p.rsn ]);
+  });
+
+  var ws=X.utils.aoa_to_sheet(aoa,{cellDates:true});
+  /* формат дат и ширина столбцов */
+  var lastRow=aoa.length;
+  [9,11,12].forEach(function(c){                 /* САНАИ ТАВАЛЛУД, ҚАБУЛ, ХОРИҶ */
+    for(var r=1;r<lastRow;r++){
+      var ref=X.utils.encode_cell({c:c,r:r}), cell=ws[ref];
+      if(cell && cell.t==="d") cell.z="dd.mm.yyyy";
+    }
+  });
+  ws["!cols"]=[{wch:34},{wch:18},{wch:26},{wch:28},{wch:24},{wch:14},{wch:10},
+               {wch:12},{wch:6},{wch:13},{wch:7},{wch:13},{wch:13},{wch:15},{wch:26}];
+  ws["!autofilter"]={ref:X.utils.encode_range({s:{c:0,r:0},e:{c:head.length-1,r:lastRow-1}})};
+  ws["!freeze"]={xSplit:0,ySplit:1};
+
+  var wb=X.utils.book_new();
+  X.utils.book_append_sheet(wb,ws,"Кормандон");
+  var d=new Date(), p2=function(n){return (n<10?"0":"")+n};
+  var name="Кормандон_"+d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+".xlsx";
+  /* собираем файл сами и отдаём ссылкой — так же, как остальные выгрузки */
+  var out=X.write(wb,{bookType:"xlsx",type:"array"});
+  var blob=new Blob([out],
+    {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
   var a=document.createElement("a");
-  a.href=URL.createObjectURL(blob); a.download="сотрудники.csv"; a.click();
-  setTimeout(function(){URL.revokeObjectURL(a.href)},1000);
+  a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href) },3000);
 });
 
 
