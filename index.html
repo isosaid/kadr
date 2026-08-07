@@ -1591,8 +1591,9 @@ function sortView(){
 }
 var RH=46, sc=el("scroller"), rowsBox=el("rows");
 function table(){
-  var L=VIEW.length, a=L%100, b=a%10, w=(a>10&&a<20)?"записей":(b===1?"запись":(b>1&&b<5?"записи":"записей"));
-  el("cnt").textContent = n(L)+" "+w;
+  var L=VIEW.length, a=L%100, b=a%10,
+      w=(a>10&&a<20)?"сотрудников":(b===1?"сотрудник":(b>1&&b<5?"сотрудника":"сотрудников"));
+  el("cnt").textContent = "Найдено: "+n(L)+" "+w;
   if(!VIEW.length){
     rowsBox.style.height="auto";
     rowsBox.innerHTML='<div class="empty"><b>Ничего не найдено</b>Снимите часть фильтров или измените поисковый запрос.</div>';
