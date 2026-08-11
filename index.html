@@ -2593,6 +2593,7 @@ function paint(){
   var scope = (CUR && CUR.admin) ? "Все пользователи" : "Только ваши входы";
   var where = LOGSRC==="server" ? "общая база — входы со всех компьютеров"
             : LOGSRC==="wait"   ? "загрузка…"
+            : LOGSRC==="denied" ? "общая база не приняла этот аккаунт — показан только этот браузер"
             : "только этот браузер (общая база недоступна)";
   document.getElementById("logSub").textContent = scope+" · "+where+" · записей: "+LOGVIEW.length;
   document.getElementById("logClear").hidden = !(CUR && CUR.admin) || !LOGVIEW.length;
@@ -2605,7 +2606,13 @@ function renderLog(){
   LOGVIEW=localView(); LOGSRC="wait"; paint();
   api("list",{email:CUR.email,hash:CUR.hash}).then(function(j){
     LOGVIEW=j.items||[]; LOGSRC="server"; paint();
-  }).catch(function(){ LOGVIEW=localView(); LOGSRC="local"; paint() });
+  }).catch(function(e){
+    LOGVIEW=localView();
+    /* «auth» — аккаунт есть на странице, но не заведён в серверной функции:
+       его входы в общую базу не попадают. Раньше это происходило молча. */
+    LOGSRC=(e && /auth/i.test(String(e.message))) ? "denied" : "local";
+    paint();
+  });
 }
 function openLog(){
   renderLog();
