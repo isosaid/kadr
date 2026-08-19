@@ -392,6 +392,20 @@ body.loaded #empAdd{display:inline-block}
 .emp-actions{display:flex;gap:10px;margin-top:16px;align-items:center}
 .emp-actions .btn.primary{background:#0B7A66;color:#fff;border-color:#0B7A66}
 .emp-actions .btn.danger{color:#B0452A;border-color:#e0b5a8;margin-left:auto}
+
+/* ===== подвал ===== */
+.foot{margin:34px auto 26px;padding:22px 20px 0;max-width:1500px;text-align:center;
+  border-top:1px solid var(--line2);color:var(--ink3);font-size:12.5px;line-height:1.75}
+.foot .f-title{font-size:14px;font-weight:700;color:var(--focus);margin-bottom:2px}
+.foot .f-title span{font-weight:600;color:var(--ink2)}
+.foot .f-dev{margin-top:6px;color:var(--ink2)}
+.foot .f-dev b{font-weight:600;color:var(--focus)}
+.foot .isj{display:inline-flex;align-items:center;justify-content:center;
+  background:var(--focus);color:#fff;font:600 10.5px/1 var(--mono);letter-spacing:.08em;
+  border-radius:4px;padding:4px 7px;margin-left:7px;vertical-align:middle}
+.foot .f-meta{margin-top:8px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;
+  color:var(--ink3)}
+@media (max-width:640px){.foot{font-size:12px;padding-top:18px}}
 #logHist{display:none}
 body.loaded #logHist{display:inline-block}
 /* ===== история входа ===== */
@@ -548,6 +562,13 @@ body.loaded #loadReopen{display:inline-block}
     </details>
   </div>
 
+  <footer class="foot">
+    <p class="f-title">HR аналитика · <span>платформа кадровой аналитики холдинга</span></p>
+    <p class="f-src">Источник данных: <span id="fSrc">встроенная выгрузка</span> · <span id="fCnt">—</span></p>
+    <p class="f-dev">Разработано <b>Отделом автоматизации</b> холдинга ООО «Авесто Групп»<span class="isj">ISJ</span></p>
+    <p class="f-meta">версия 1.0 · хранилище: локальное · © <span id="fYear">2026</span></p>
+  </footer>
+
   <div class="load" id="load">
     <div class="upload-panel">
       <h2>Загрузка данных</h2>
@@ -673,6 +694,17 @@ function boot(payload){
   document.body.classList.add("loaded");
   buildCols(); buildCoSelect(); render();
   if(window.__accSync) window.__accSync();
+  fillFoot(payload);
+}
+/* подвал: источник и объём данных берём из самой выгрузки */
+function fillFoot(payload){
+  var all=(window.__ALLP||P), L=all.length, a=L%100, b=a%10,
+      w=(a>10&&a<20)?"сотрудников":(b===1?"сотрудник":(b>1&&b<5?"сотрудника":"сотрудников"));
+  var src=(payload&&payload.source) ? payload.source : "встроенная выгрузка";
+  var e1=el("fSrc"), e2=el("fCnt"), e3=el("fYear");
+  if(e1) e1.textContent=src;
+  if(e2) e2.textContent=n(L)+" "+w;
+  if(e3) e3.textContent=String(new Date().getFullYear());
 }
 window.__boot = boot;
 function fail(msg){
