@@ -1298,8 +1298,13 @@ function chip(k,l,v){ return '<button class="chip" data-k="'+k+'"><em>'+l+'</em>
 el("chips").addEventListener("click",function(e){
   var b=e.target.closest(".chip"); if(!b) return;
   var k=b.dataset.k;
-  if(k==="__all"){ F={q:"",act:F.act,co:null,un:null,cat:null,ctr:null,gen:null,mgr:null,pos:null,
-                      yr:null,mon:null,age:null,ten:null}; el("q").value="" }
+  if(k==="__all"){
+    /* сброс возвращает всё к исходному виду, включая статус */
+    F={q:"",act:"1",co:null,un:null,cat:null,ctr:null,gen:null,mgr:null,pos:null,
+       yr:null,mon:null,age:null,ten:null};
+    el("q").value="";
+    setAct("1"); return;                 /* setAct сам перерисует список и кнопки */
+  }
   else if(k==="q"){ F.q=""; el("q").value="" }
   else if(k==="per"){ F.yr=null; F.mon=null }
   else if(k==="act"){ setAct(F.act===""?"1":""); return }
