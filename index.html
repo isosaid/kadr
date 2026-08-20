@@ -408,6 +408,7 @@ body.loaded #empAdd{display:inline-block}
 @media (max-width:640px){.foot{font-size:12px;padding-top:18px}}
 #logHist{display:none}
 body.loaded #logHist{display:inline-block}
+#dbPush{display:none}
 /* ===== история входа ===== */
 #logModal{position:fixed;inset:0;z-index:85;display:none;align-items:flex-start;justify-content:center;
   overflow:auto;background:rgba(15,22,28,.5);padding:34px 14px}
@@ -472,6 +473,7 @@ body.loaded #loadReopen{display:inline-block}
     <span id="userBadge" hidden></span>
     <button class="btn" id="empAdd">+ Сотрудник</button>
     <button class="btn" id="logHist" title="Кто и когда входил в дашборд">История входа</button>
+    <button class="btn" id="dbPush" title="Записать текущие данные в общую базу — после этого их увидят все">Сохранить базу</button>
     <button class="btn" id="loadReopen">Загрузить файл</button>
     <button class="btn" id="csv">Скачать Excel</button>
     <button class="btn" id="logoutBtn" title="Сменить пользователя">Выйти</button>
@@ -678,6 +680,8 @@ function computeDMax(){
 }
 function boot(payload){
   CFD = payload.cfd || [];
+  window.__META_GEN = payload.generated || "";
+  window.__META_SRC = payload.source || "";
   window.__ALLP = payload.people||[];
   P = (CURU && !CURU.admin) ? __userFilter(window.__ALLP, CURU) : window.__ALLP;
   computeDMax();
@@ -705,8 +709,10 @@ function fillFoot(payload){
   if(e1) e1.textContent=src;
   if(e2) e2.textContent=n(L)+" "+w;
   if(e3) e3.textContent=String(new Date().getFullYear());
-  if(e4) e4.textContent = (typeof EDITS_ON!=="undefined" && EDITS_ON)
-    ? "общая база" : "локальное";
+  if(e4) e4.textContent =
+      (typeof DB_ON!=="undefined" && DB_ON) ? "общая база"
+    : (typeof EDITS_ON!=="undefined" && EDITS_ON) ? "файл + база правок"
+    : "локальное";
 }
 window.__boot = boot;
 function fail(msg){
@@ -727,6 +733,73 @@ function readFile(f){
   r.onload=function(){ try{ boot(JSON.parse(r.result)) }catch(e){ alert("Файл не читается как JSON: "+e.message) } };
   r.readAsText(f,"utf-8");
 }
+/* ============ полная база на сервере ============
+   Данные лежат в общей базе кусками; страница склеивает их при запуске.
+   Встроенная выгрузка остаётся запасным вариантом — для офлайна и на случай,
+   если база ещё пустая. */
+function dataApi(action, extra, who){
+  if(location.protocol==="file:" || typeof fetch!=="function")
+    return Promise.reject(new Error("offline"));
+  var cred = who || CURU;
+  if(!cred) return Promise.reject(new Error("no_user"));
+  var body={action:action, email:cred.email, hash:cred.hash};
+  for(var k in extra) body[k]=extra[k];
+  return fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(body)}).then(function(r){
+      return r.json().then(function(j){
+        if(!r.ok) throw new Error(j.error||("HTTP "+r.status));
+        return j;
+      });
+    });
+}
+
+/* Скачиваем базу кусками; на каждом шаге показываем, сколько уже получено */
+function fetchDataset(who, onProgress){
+  return dataApi("meta",{},who).then(function(j){
+    var meta=j.meta;
+    if(!meta || !meta.chunks) return null;          /* база ещё не заполнена */
+    var parts=new Array(meta.chunks), done=0;
+    var seq=Promise.resolve();
+    for(var i=0;i<meta.chunks;i++){
+      (function(idx){
+        seq=seq.then(function(){
+          return dataApi("chunk",{i:idx},who).then(function(r){
+            parts[idx]=r.s; done++;
+            if(onProgress) onProgress(done, meta.chunks);
+          });
+        });
+      })(i);
+    }
+    return seq.then(function(){ return JSON.parse(parts.join("")) });
+  });
+}
+
+/* Заливка текущих данных в общую базу — только для администратора */
+function pushDataset(onProgress){
+  var payload={ generated:(window.__META_GEN||""), source:(window.__META_SRC||""),
+                people:(window.__ALLP||P), cfd:CFD };
+  var s=JSON.stringify(payload);
+  var SIZE=300*1024, parts=[];
+  for(var i=0;i<s.length;i+=SIZE) parts.push(s.slice(i,i+SIZE));
+  var total=parts.length;
+  return dataApi("begin",{}).then(function(){
+    var seq=Promise.resolve();
+    parts.forEach(function(part,idx){
+      seq=seq.then(function(){
+        return dataApi("part",{i:idx,s:part}).then(function(){
+          if(onProgress) onProgress(idx+1,total);
+        });
+      });
+    });
+    return seq;
+  }).then(function(){
+    return dataApi("commit",{chunks:total, generated:payload.generated,
+      source:payload.source, count:payload.people.length, size:s.length});
+  });
+}
+
+window.__pushDataset = pushDataset;   /* кнопкой управляет скрипт авторизации */
+
 function start(){
   if(window.__DATA__){ boot(window.__DATA__); return }
   fetch("data.json").then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json() })
@@ -2210,8 +2283,33 @@ window.__setUser = function(u){
     __updMeta();
     computeDMax(); buildCoSelect(); render();
   }
-  if(CURU) loadEdits();
+  if(!CURU) return;
+  var pb=el("dbPush");
+  if(pb) pb.style.display = CURU.admin ? "inline-block" : "none";
+  if(DB_TRIED) return;                   /* база тянется один раз за сессию */
+  DB_TRIED = true;
+  /* сначала подтягиваем общую базу, затем слой правок поверх неё */
+  fetchDataset(CURU, function(done,total){
+    el("meta").textContent = "загрузка базы… "+done+" из "+total;
+  }).then(function(ds){
+    if(ds && ds.people && ds.people.length){
+      DB_ON = true;
+      var keep = CURU;
+      CURU = null;                       /* boot заново применит фильтр по пользователю */
+      boot(ds);
+      window.__setUser(keep);
+      loadEdits();                       /* правки ложатся поверх базы */
+      return;
+    }
+    DB_ON = false; __updMeta(); loadEdits();
+  }).catch(function(e){
+    DB_ON = false;
+    if(e && e.message!=="offline") console.warn("база не прочитана:", e.message);
+    __updMeta(); loadEdits();
+  });
 };
+var DB_ON = false;                       /* данные пришли из общей базы, а не из файла */
+var DB_TRIED = false;
 
 start();
 })();
@@ -2765,6 +2863,26 @@ document.getElementById("authForm").addEventListener("submit",function(e){
            document.getElementById("authPwd").focus(); }
   else err.classList.remove("on");
 });
+var pushBtn=document.getElementById("dbPush");
+if(pushBtn) pushBtn.addEventListener("click",function(){
+  var push = window.__pushDataset;
+  if(typeof push!=="function") return;
+  var all=(window.__ALLP||[]);
+  if(!all.length){ alert("Нечего сохранять — данные ещё не загружены."); return }
+  if(!confirm("Записать текущие данные ("+all.length.toLocaleString("ru-RU")+" чел.) "+
+     "в общую базу?\nПрежнее содержимое базы будет заменено.")) return;
+  var was=pushBtn.textContent;
+  pushBtn.disabled=true;
+  push(function(done,total){ pushBtn.textContent="Сохранение "+done+"/"+total }).then(function(){
+    pushBtn.textContent="Сохранено ✓";
+    setTimeout(function(){ pushBtn.textContent=was; pushBtn.disabled=false },2500);
+    alert("База сохранена. Теперь данные подтягиваются из неё при каждом входе.");
+  }).catch(function(e){
+    pushBtn.textContent=was; pushBtn.disabled=false;
+    alert("Сохранить базу не удалось: "+(e && e.message||e));
+  });
+});
+
 var hb=document.getElementById("logHist");
 if(hb) hb.addEventListener("click",openLog);
 document.getElementById("logX").addEventListener("click",closeLog);

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Синхронизация списка пользователей: index.html -> api/logins.js и api/employees.js
+"""Синхронизация списка пользователей: index.html -> все функции в api/
 
 Страница и серверная функция должны знать одних и тех же пользователей.
 Раньше список правился в двух местах руками, и они разъехались: новый админ
@@ -19,6 +19,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE = os.path.join(ROOT, "index.html")
 FUNC = os.path.join(ROOT, "api", "logins.js")
 EMPL = os.path.join(ROOT, "api", "employees.js")
+DATA = os.path.join(ROOT, "api", "data.js")
 
 
 def main():
@@ -36,7 +37,7 @@ def main():
     print("Пользователей на странице: %d (админов %d)"
           % (len(slim), sum(1 for v in slim.values() if v["a"])))
 
-    for path, data in ((FUNC, slim), (EMPL, full)):
+    for path, data in ((FUNC, slim), (EMPL, full), (DATA, full)):
         name = os.path.relpath(path, ROOT)
         if not os.path.exists(path):
             print("  %s — файла нет, пропускаю" % name)
