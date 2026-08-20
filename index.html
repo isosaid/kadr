@@ -566,7 +566,7 @@ body.loaded #loadReopen{display:inline-block}
     <p class="f-title">HR аналитика · <span>платформа кадровой аналитики холдинга</span></p>
     <p class="f-src">Источник данных: <span id="fSrc">встроенная выгрузка</span> · <span id="fCnt">—</span></p>
     <p class="f-dev">Разработано <b>Отделом автоматизации</b> холдинга ООО «Авесто Групп»<span class="isj">ISJ</span></p>
-    <p class="f-meta">версия 1.0 · хранилище: локальное · © <span id="fYear">2026</span></p>
+    <p class="f-meta">версия 1.1 · хранилище: <span id="fStore">локальное</span> · © <span id="fYear">2026</span></p>
   </footer>
 
   <div class="load" id="load">
@@ -701,10 +701,12 @@ function fillFoot(payload){
   var all=(window.__ALLP||P), L=all.length, a=L%100, b=a%10,
       w=(a>10&&a<20)?"сотрудников":(b===1?"сотрудник":(b>1&&b<5?"сотрудника":"сотрудников"));
   var src=(payload&&payload.source) ? payload.source : "встроенная выгрузка";
-  var e1=el("fSrc"), e2=el("fCnt"), e3=el("fYear");
+  var e1=el("fSrc"), e2=el("fCnt"), e3=el("fYear"), e4=el("fStore");
   if(e1) e1.textContent=src;
   if(e2) e2.textContent=n(L)+" "+w;
   if(e3) e3.textContent=String(new Date().getFullYear());
+  if(e4) e4.textContent = (typeof EDITS_ON!=="undefined" && EDITS_ON)
+    ? "общая база" : "локальное";
 }
 window.__boot = boot;
 function fail(msg){
@@ -1869,6 +1871,27 @@ el("csv").addEventListener("click",function(){
     modal.classList.remove("on"); modal.setAttribute("aria-hidden","true"); editing=null;
   }
 
+  /* Отправка правки в общую базу. Если базы нет (офлайн-файл или сбой),
+     честно предупреждаем: правка видна только в этой вкладке. */
+  function persist(action, p){
+    var clean={};
+    for(var k in p){ if(k.charAt(0)!=="_") clean[k]=p[k] }
+    if(typeof empApi!=="function"){ warnLocal(); return }
+    empApi(action,{id:p.id, person:clean}).catch(function(e){
+      var m=String(e && e.message||"");
+      if(m==="offline"){ warnLocal(); return }
+      if(m==="forbidden"){ alert("Сохранить не удалось: эта компания вам недоступна."); return }
+      alert("Сохранить в общую базу не удалось: "+m+
+            "\nПравка осталась только в этой вкладке и пропадёт при обновлении страницы.");
+    });
+  }
+  var warned=false;
+  function warnLocal(){
+    if(warned) return; warned=true;
+    alert("Общая база недоступна — правки видны только в этой вкладке "+
+          "и пропадут при обновлении страницы.");
+  }
+
   function refreshAll(msg){
     computeDMax();
     if(DMAX && (!TODAY || DMAX>TODAY)) TODAY=DMAX;
@@ -1940,6 +1963,7 @@ el("csv").addEventListener("click",function(){
     delete p._cos; delete p._ce; delete p._h;
 
     refreshAll();
+    persist("save", p);          /* складываем правку в общую базу */
     closeForm();
     if(typeof openCard==="function") openCard(p,co);
   }
@@ -1956,7 +1980,9 @@ el("csv").addEventListener("click",function(){
       var j=window.__ALLP.indexOf(editing);
       if(j>=0) window.__ALLP.splice(j,1);
     }
+    var gone=editing;
     refreshAll();
+    persist("delete", gone);
     closeForm();
     el("drawer").classList.remove("on"); el("drawer").setAttribute("aria-hidden","true");
     el("scrim").classList.remove("on");
@@ -2108,6 +2134,68 @@ function __updMeta(){
     ? " · доступ: "+CURU.companies.join(", ")+" — "+P.length.toLocaleString("ru-RU")+" чел."
     : "");
 }
+/* ============ правки сотрудников в общей базе ============
+   Встроенная выгрузка неизменна; всё, что правят через форму, лежит в базе
+   отдельным слоем и накладывается поверх при загрузке. */
+var EDITS_ON = false;                       /* база отвечает — правки сохраняются */
+
+function empApi(action, extra){
+  if(location.protocol==="file:" || typeof fetch!=="function")
+    return Promise.reject(new Error("offline"));
+  if(!CURU) return Promise.reject(new Error("no_user"));
+  var body={action:action, email:CURU.email, hash:CURU.hash};
+  for(var k in extra) body[k]=extra[k];
+  return fetch("/api/employees",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(body)}).then(function(r){
+      return r.json().then(function(j){
+        if(!r.ok) throw new Error(j.error||("HTTP "+r.status));
+        return j;
+      });
+    });
+}
+
+/* накладываем слой правок на встроенные данные */
+function applyEdits(items){
+  var all=window.__ALLP||[], byId={}, i;
+  for(i=0;i<all.length;i++) byId[all[i].id]=i;
+  var changed=0;
+  (items||[]).forEach(function(x){
+    if(!x || !x.id) return;
+    var at=byId[x.id];
+    if(x.op==="delete"){
+      if(at!=null){ all[at]=null; changed++ }
+    } else if(x.p){
+      if(at!=null){ all[at]=x.p } else { all.push(x.p) }
+      changed++;
+    }
+  });
+  if(!changed) return 0;
+  /* удалённых вычищаем и заново строим индекс */
+  window.__ALLP = all.filter(Boolean);
+  window.__ALLP.forEach(function(p){ delete p._cos; delete p._ce; delete p._h });
+  return changed;
+}
+
+function loadEdits(){
+  return empApi("list",{}).then(function(j){
+    EDITS_ON = true;
+    var n = applyEdits(j.items);
+    if(n){
+      P = (CURU && !CURU.admin) ? __userFilter(window.__ALLP, CURU) : window.__ALLP;
+      /* в шапке число людей пересчитываем: слой правок мог добавить или убрать */
+      META = META.replace(/·\s[\d\s\u00a0]+чел\.$/,
+             "· "+window.__ALLP.length.toLocaleString("ru-RU")+" чел.");
+      computeDMax(); __updMeta(); buildCoSelect(); render();
+      if(typeof fillFoot==="function") fillFoot(null);
+    }
+    return n;
+  }).catch(function(e){
+    EDITS_ON=false;
+    if(e && e.message!=="offline") console.warn("правки не загружены:", e.message);
+    return 0;
+  });
+}
+
 window.__setUser = function(u){
   CURU = u || null;
   var ub=el("userBadge"), lb=el("logoutBtn");
@@ -2122,6 +2210,7 @@ window.__setUser = function(u){
     __updMeta();
     computeDMax(); buildCoSelect(); render();
   }
+  if(CURU) loadEdits();
 };
 
 start();
