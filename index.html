@@ -1724,6 +1724,11 @@ el("cols").addEventListener("click",function(e){
     if(SORT.k===k) SORT.dir*=-1; else { SORT.k=k; SORT.dir=(k==="fio"||k==="co"||k==="pos"||k==="un")?1:-1 }
     sortView(); table();
 });
+var LETTER=/[a-zа-яёӯғҳӣҷқ]/i;
+function startsLetter(v){
+  var s=String(v==null?"":v).trim();
+  return s.length>0 && LETTER.test(s.charAt(0));
+}
 function sortView(){
   var k=SORT.k,d=SORT.dir;
   var rank={1:0,0:1,2:2};                       /* работает → уволен → без дат */
@@ -1736,6 +1741,10 @@ function sortView(){
     else { x=a[k]; y=b[k] }
     if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1;
     if(typeof x==="number") return (x-y)*d;
+    /* записи без нормальной фамилии («* Умедҷони Шариф», «- Ҳисайни Ғафор»)
+       уводим в конец списка, а не в начало — при любом направлении сортировки */
+    var xa=startsLetter(x), ya=startsLetter(y);
+    if(xa!==ya) return xa ? -1 : 1;
     return String(x).localeCompare(String(y),"ru")*d;
   });
   Array.prototype.forEach.call(el("cols").children,function(b){
