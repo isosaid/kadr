@@ -438,6 +438,48 @@ body.loaded .menu-wrap{display:block}
 #dbPush,#logHist,#loadReopen,#empAdd,#csv,#logoutBtn{}
 body.loaded #logHist{display:inline-block}
 #dbPush{display:none}
+
+/* ===== пользователи ===== */
+#usrModal{position:fixed;inset:0;z-index:86;display:none;align-items:flex-start;justify-content:center;
+  overflow:auto;background:rgba(15,22,28,.5);padding:30px 14px}
+#usrModal.on{display:flex}
+.usr-box{background:#fff;border-radius:14px;box-shadow:0 22px 70px rgba(0,0,0,.3);
+  max-width:720px;width:100%;padding:22px 26px 20px;position:relative}
+.usr-box h2{margin:0 0 3px;font-size:19px}
+.usr-box .sub{margin:0 0 14px;font-size:12.5px;color:var(--ink3)}
+.usr-box .x{position:absolute;top:10px;right:12px;border:0;background:none;font-size:22px;
+  cursor:pointer;color:#888;line-height:1}
+.usr-scroll{max-height:34vh;overflow:auto;border:1px solid var(--line2);border-radius:9px}
+.usr-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.usr-tbl th{position:sticky;top:0;background:var(--surface);text-align:left;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink3);padding:8px 10px;border-bottom:1px solid var(--line2)}
+.usr-tbl td{padding:7px 10px;border-top:1px solid var(--line2);vertical-align:top}
+.usr-tbl tr.me td{background:var(--hire-bg)}
+.usr-tbl .adm{font-size:10.5px;color:var(--hire);background:var(--hire-bg);
+  border-radius:99px;padding:1px 6px;margin-left:6px}
+.usr-tbl .lock{font-size:10.5px;color:var(--ink3);margin-left:6px}
+.usr-tbl .cos{color:var(--ink2);font-size:12px;line-height:1.5}
+.usr-tbl button{border:0;background:none;cursor:pointer;font:inherit;font-size:12.5px;
+  color:var(--focus);padding:2px 6px;border-radius:6px}
+.usr-tbl button:hover{background:var(--paper)}
+.usr-tbl button.del{color:var(--fire)}
+.usr-form{margin-top:16px;border-top:1px solid var(--line2);padding-top:14px}
+.usr-form h3{margin:0 0 10px;font-size:14px}
+.usr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+@media (max-width:620px){.usr-grid{grid-template-columns:1fr}}
+.usr-grid label{display:flex;flex-direction:column;font-size:12px;color:#5a6772;gap:4px;font-weight:600}
+.usr-grid label.wide{grid-column:1/-1}
+.usr-grid input,.usr-grid select{border:1px solid #ccd4da;border-radius:8px;padding:8px 10px;
+  font:inherit;font-weight:400;color:var(--ink);background:#fff}
+.usr-grid select[multiple]{padding:4px}
+.usr-grid .hint{font-weight:400;font-size:11px;color:var(--ink3)}
+.usr-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.usr-actions .btn.primary{background:var(--hire);color:#fff;border-color:var(--hire)}
+.usr-msg{margin-top:10px;font-size:12.5px;padding:8px 10px;border-radius:8px;display:none}
+.usr-msg.on{display:block}
+.usr-msg.ok{color:var(--hire);background:var(--hire-bg);border:1px solid #b9dcd3}
+.usr-msg.err{color:var(--fire);background:var(--fire-bg);border:1px solid #e6c3b8}
 /* ===== история входа ===== */
 #logModal{position:fixed;inset:0;z-index:85;display:none;align-items:flex-start;justify-content:center;
   overflow:auto;background:rgba(15,22,28,.5);padding:34px 14px}
@@ -510,6 +552,7 @@ body.loaded #loadReopen{display:inline-block}
         <button class="menu-i" id="csv">Скачать Excel</button>
         <div class="menu-sep"></div>
         <button class="menu-i" id="logHist">История входа</button>
+        <button class="menu-i" id="usersBtn">Пользователи</button>
         <button class="menu-i" id="dbPush">Сохранить базу</button>
         <button class="menu-i" id="loadReopen">Загрузить файл</button>
         <div class="menu-sep"></div>
@@ -654,6 +697,42 @@ body.loaded #loadReopen{display:inline-block}
     <button class="btn" id="logCsv">Скачать CSV</button>
     <button class="btn danger" id="logClear" hidden>Очистить</button>
   </div>
+ </div>
+</div>
+
+<div id="usrModal" aria-hidden="true">
+ <div class="usr-box">
+  <button type="button" class="x" id="usrX" aria-label="Закрыть">×</button>
+  <h2>Пользователи</h2>
+  <p class="sub" id="usrSub"></p>
+
+  <div class="usr-scroll"><table class="usr-tbl">
+    <thead><tr><th>Почта</th><th>Доступ</th><th></th></tr></thead>
+    <tbody id="usrRows"></tbody>
+  </table></div>
+
+  <form class="usr-form" id="usrForm">
+    <h3 id="usrFormTitle">Новый пользователь</h3>
+    <div class="usr-grid">
+      <label class="wide">Почта *<input id="u_mail" type="email" autocomplete="off" required></label>
+      <label>Пароль<input id="u_pwd" type="text" autocomplete="off" placeholder="оставьте пустым — не менять"></label>
+      <label>Роль
+        <select id="u_role">
+          <option value="0">Пользователь — только свои компании</option>
+          <option value="1">Администратор — все компании</option>
+        </select>
+      </label>
+      <label class="wide" id="u_coWrap">Компании *
+        <select id="u_co" multiple size="7"></select>
+        <span class="hint">Держите Ctrl (на Mac — Cmd), чтобы выбрать несколько</span>
+      </label>
+    </div>
+    <div class="usr-actions">
+      <button class="btn primary" type="submit" id="u_save">Сохранить</button>
+      <button class="btn" type="button" id="u_reset">Очистить</button>
+      <button class="btn" type="button" id="u_gen">Придумать пароль</button>
+    </div>
+  </form>
  </div>
 </div>
 
@@ -1175,6 +1254,10 @@ function buildCoSelect(){
     CO_ALL=CO_ALL.filter(function(r){ return _al[fold(r[0])] });
   }
   CO_ABC=CO_ALL.slice().sort(function(x,y){ return String(x[0]).localeCompare(String(y[0]),"ru") });
+  /* полный перечень компаний — для формы пользователей (там нужны все, а не только свои) */
+  var _every={};
+  (window.__ALLP||P).forEach(function(p){ cos(p).forEach(function(c){ if(c) _every[c]=1 }) });
+  window.__ALL_COMPANIES = Object.keys(_every);
   var tot=P.length;
   el("cosel").innerHTML='<option value="">Все компании</option>'+
     CO_ABC.map(function(r){ return '<option value="'+esc(r[0])+'">'+esc(r[0])+'</option>' }).join("");
@@ -2356,7 +2439,7 @@ window.__setUser = function(u){
   CURU = u || null;
   var ub=el("userBadge");
   if(ub) ub.textContent = CURU ? (CURU.admin ? CURU.email+" · админ" : CURU.email) : "";
-  [el("loadReopen"), el("dbPush")].forEach(function(b){
+  [el("loadReopen"), el("dbPush"), el("usersBtn")].forEach(function(b){
     if(b) b.style.display = (CURU && !CURU.admin) ? "none" : "" });
   if(window.__ALLP){
     P = (CURU && !CURU.admin) ? __userFilter(window.__ALLP, CURU) : window.__ALLP;
@@ -2937,11 +3020,30 @@ document.getElementById("authForm").addEventListener("submit",function(e){
   e.preventDefault();
   var em=document.getElementById("authEmail").value.trim().toLowerCase();
   var pw=document.getElementById("authPwd").value;
-  var ok=login(em, sha256(em+"|"+pw), true);
+  var hash=sha256(em+"|"+pw);
   var err=document.getElementById("authErr");
-  if(!ok){ err.classList.add("on"); document.getElementById("authPwd").value="";
-           document.getElementById("authPwd").focus(); }
-  else err.classList.remove("on");
+  var btn=e.target.querySelector("button[type=submit]");
+  if(login(em, hash, true)){ err.classList.remove("on"); return }
+  /* в файле такого нет — спросим сервер: пользователь мог быть заведён через форму */
+  err.classList.remove("on");
+  if(btn){ btn.disabled=true; btn.textContent="Проверяем…" }
+  var done=function(ok){
+    if(btn){ btn.disabled=false; btn.textContent="Войти" }
+    if(ok) return;
+    err.classList.add("on");
+    document.getElementById("authPwd").value="";
+    document.getElementById("authPwd").focus();
+  };
+  if(location.protocol==="file:" || typeof fetch!=="function"){ done(false); return }
+  fetch("/api/users",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({action:"login",email:em,hash:hash})})
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j} }) })
+    .then(function(res){
+      if(!res.ok || !res.j.ok){ done(false); return }
+      USERS[em]={h:hash, a:res.j.admin?1:0, c:res.j.companies||[]};
+      done(login(em, hash, true));
+    })
+    .catch(function(){ done(false) });
 });
 /* ---- меню-бургер ---- */
 (function(){
@@ -2955,6 +3057,154 @@ document.getElementById("authForm").addEventListener("submit",function(e){
   });
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") close() });
   m.addEventListener("click",function(e){ if(e.target.closest(".menu-i")) close() });
+})();
+
+/* ---- пользователи ---- */
+(function(){
+  var modal=document.getElementById("usrModal");
+  if(!modal) return;
+  var editing=null;                       /* какую почту правим */
+
+  function api(action,extra){
+    var body={action:action, email:CUR.email, hash:CUR.hash};
+    for(var k in extra) body[k]=extra[k];
+    return fetch("/api/users",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(body)}).then(function(r){
+        return r.json().then(function(j){
+          if(!r.ok) throw new Error(j.error||("HTTP "+r.status));
+          return j;
+        });
+      });
+  }
+  function msg(text,kind){
+    var m=document.getElementById("usrMsg");
+    if(!m){ m=document.createElement("div"); m.id="usrMsg"; m.className="usr-msg";
+      document.getElementById("usrForm").appendChild(m) }
+    m.textContent=text; m.className="usr-msg on "+(kind||"ok");
+    if(kind!=="err") setTimeout(function(){ m.className="usr-msg" },4000);
+  }
+  var ERR={ auth:"Неверный пароль или учётка отключена",
+            forbidden:"Только администратор может менять пользователей",
+            builtin:"Эта учётка задана в файле — её меняют через разработчика",
+            bad_email:"Проверьте адрес почты",
+            no_password:"Для нового пользователя нужен пароль",
+            no_companies:"Выберите хотя бы одну компанию",
+            self:"Нельзя удалить самого себя",
+            storage_not_configured:"База не подключена" };
+  function why(e){ var k=String(e&&e.message||e); return ERR[k]||k }
+
+  function pwd(){
+    var a="abcdefghjkmnpqrstuvwxyz", A=a.toUpperCase(), d="23456789", pick=function(s){
+      return s.charAt(Math.floor(Math.random()*s.length)) };
+    return pick(A)+pick(a)+pick(a)+pick(d)+pick(d)+"-"+pick(a)+pick(a)+pick(d)+pick(d);
+  }
+  function esc3(s){ return String(s==null?"":s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;") }
+
+  function fillCompanies(sel){
+    var box=document.getElementById("u_co");
+    var list=(window.__ALL_COMPANIES||[]).slice().sort(function(a,b){
+      return String(a).localeCompare(String(b),"ru") });
+    var chosen={}; (sel||[]).forEach(function(c){ chosen[c]=1 });
+    box.innerHTML=list.map(function(c){
+      return '<option value="'+esc3(c)+'"'+(chosen[c]?" selected":"")+'>'+esc3(c)+'</option>' }).join("");
+  }
+  function roleToggle(){
+    var adm=document.getElementById("u_role").value==="1";
+    document.getElementById("u_coWrap").style.display = adm ? "none" : "";
+  }
+
+  function fillForm(u){
+    editing = u ? u.email : null;
+    document.getElementById("usrFormTitle").textContent =
+      u ? "Изменение: "+u.email : "Новый пользователь";
+    document.getElementById("u_mail").value = u ? u.email : "";
+    document.getElementById("u_mail").readOnly = !!u;
+    document.getElementById("u_pwd").value = "";
+    document.getElementById("u_pwd").placeholder = u ? "оставьте пустым — не менять" : "";
+    document.getElementById("u_role").value = u && u.a ? "1" : "0";
+    fillCompanies(u ? u.c : []);
+    roleToggle();
+  }
+
+  function paint(items){
+    var tb=document.getElementById("usrRows");
+    tb.innerHTML = items.map(function(u){
+      var access = u.a ? '<span class="adm">все компании</span>'
+                       : '<span class="cos">'+esc3((u.c||[]).join(", ")||"—")+'</span>';
+      var acts = (u.src==="builtin")
+        ? '<span class="lock">из файла</span>'
+        : '<button data-act="edit" data-m="'+esc3(u.email)+'">Изменить</button>'+
+          (u.email===CUR.email ? "" :
+           '<button class="del" data-act="del" data-m="'+esc3(u.email)+'">Удалить</button>');
+      return '<tr'+(u.email===CUR.email?' class="me"':'')+'><td>'+esc3(u.email)+
+        (u.a?'<span class="adm">админ</span>':'')+'</td><td>'+access+'</td>'+
+        '<td style="white-space:nowrap">'+acts+'</td></tr>';
+    }).join("");
+    document.getElementById("usrSub").textContent =
+      "Всего "+items.length+" · заведённых через форму: "+
+      items.filter(function(u){return u.src!=="builtin"}).length;
+  }
+
+  var CACHE=[];
+  function reload(){
+    return api("list",{}).then(function(j){ CACHE=j.items||[]; paint(CACHE) })
+      .catch(function(e){ msg("Список не загружен: "+why(e),"err") });
+  }
+
+  function open(){
+    if(!CUR || !CUR.admin) return;
+    fillForm(null);
+    modal.classList.add("on"); modal.setAttribute("aria-hidden","false");
+    reload();
+  }
+  function close(){ modal.classList.remove("on"); modal.setAttribute("aria-hidden","true") }
+
+  var ub=document.getElementById("usersBtn");
+  if(ub) ub.addEventListener("click",open);
+  document.getElementById("usrX").addEventListener("click",close);
+  modal.addEventListener("mousedown",function(e){ if(e.target===modal) close() });
+  document.addEventListener("keydown",function(e){
+    if(e.key==="Escape" && modal.classList.contains("on")) close();
+  });
+  document.getElementById("u_role").addEventListener("change",roleToggle);
+  document.getElementById("u_reset").addEventListener("click",function(){ fillForm(null) });
+  document.getElementById("u_gen").addEventListener("click",function(){
+    document.getElementById("u_pwd").value=pwd();
+  });
+
+  document.getElementById("usrRows").addEventListener("click",function(e){
+    var b=e.target.closest("button"); if(!b) return;
+    var mail=b.dataset.m;
+    if(b.dataset.act==="edit"){
+      var u=CACHE.filter(function(x){ return x.email===mail })[0];
+      if(u) fillForm(u);
+      return;
+    }
+    if(!confirm("Удалить доступ для "+mail+"?")) return;
+    api("delete",{user:{email:mail}}).then(function(){
+      msg("Доступ удалён: "+mail); reload();
+    }).catch(function(e){ msg("Не удалось удалить: "+why(e),"err") });
+  });
+
+  document.getElementById("usrForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    var mail=document.getElementById("u_mail").value.trim().toLowerCase();
+    var pass=document.getElementById("u_pwd").value.trim();
+    var adm=document.getElementById("u_role").value==="1";
+    var cos=[].slice.call(document.getElementById("u_co").selectedOptions||[])
+             .map(function(o){ return o.value });
+    if(!mail){ msg("Укажите почту","err"); return }
+    if(!editing && !pass){ msg("Для нового пользователя нужен пароль","err"); return }
+    if(!adm && !cos.length){ msg("Выберите компании","err"); return }
+    var user={email:mail, a:adm?1:0, c:cos};
+    if(pass) user.h=sha256(mail+"|"+pass);
+    api("save",{user:user}).then(function(j){
+      msg(j.created ? ("Пользователь создан: "+mail+(pass?" · пароль: "+pass:""))
+                    : ("Изменения сохранены: "+mail));
+      fillForm(null); reload();
+    }).catch(function(e){ msg("Не сохранено: "+why(e),"err") });
+  });
 })();
 
 var pushBtn=document.getElementById("dbPush");

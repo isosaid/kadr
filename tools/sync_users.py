@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Синхронизация списка пользователей: index.html -> все функции в api/
+"""Синхронизация встроенного списка пользователей: index.html -> api/_shared.js
 
 Страница и серверная функция должны знать одних и тех же пользователей.
 Раньше список правился в двух местах руками, и они разъехались: новый админ
@@ -17,9 +17,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE = os.path.join(ROOT, "index.html")
-FUNC = os.path.join(ROOT, "api", "logins.js")
-EMPL = os.path.join(ROOT, "api", "employees.js")
-DATA = os.path.join(ROOT, "api", "data.js")
+SHARED = os.path.join(ROOT, "api", "_shared.js")
 
 
 def main():
@@ -29,15 +27,13 @@ def main():
         sys.exit("Не нашёл список пользователей в index.html")
     users = json.loads(m.group(1))
 
-    # журналу входов нужны только хеш и роль; правкам — ещё и список компаний,
-    # чтобы сервер сам проверял, свою ли компанию правит пользователь
-    slim = {k: {"h": v["h"], "a": v.get("a", 0)} for k, v in users.items()}
+    # серверу нужны хеш, роль и компании — он сам проверяет, свою ли правят
     full = {k: {"h": v["h"], "a": v.get("a", 0), "c": v.get("c", [])} for k, v in users.items()}
 
     print("Пользователей на странице: %d (админов %d)"
-          % (len(slim), sum(1 for v in slim.values() if v["a"])))
+          % (len(full), sum(1 for v in full.values() if v["a"])))
 
-    for path, data in ((FUNC, slim), (EMPL, full), (DATA, full)):
+    for path, data in ((SHARED, full),):
         name = os.path.relpath(path, ROOT)
         if not os.path.exists(path):
             print("  %s — файла нет, пропускаю" % name)
