@@ -406,7 +406,30 @@ body.loaded #empAdd{display:inline-block}
 .foot .f-meta{margin-top:8px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;
   color:var(--ink3)}
 @media (max-width:640px){.foot{font-size:12px;padding-top:18px}}
-#logHist{display:none}
+
+/* ===== меню-бургер ===== */
+.menu-wrap{position:relative;display:none}
+body.loaded .menu-wrap{display:block}
+.btn.burger{padding:7px 10px;line-height:0}
+.menu{position:absolute;right:0;top:calc(100% + 6px);z-index:60;min-width:232px;
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  box-shadow:0 16px 44px rgba(15,22,28,.18);padding:6px;overflow:hidden}
+.menu-user{font-size:11.5px;color:var(--ink3);font-family:var(--mono);
+  padding:7px 10px 8px;border-bottom:1px solid var(--line2);margin-bottom:4px;
+  word-break:break-all;line-height:1.5}
+.menu-i{display:block;width:100%;text-align:left;background:none;border:0;
+  font:inherit;font-size:13.5px;color:var(--ink);padding:9px 10px;border-radius:7px;cursor:pointer}
+.menu-i:hover{background:var(--paper)}
+.menu-i.danger{color:var(--fire)}
+.menu-sep{height:1px;background:var(--line2);margin:4px 0}
+/* поля отбора шире — кнопки-пилюли убраны */
+.cosel-box{flex:1 1 auto;max-width:none}
+.cosel-box select{flex:1 1 auto;width:100%;min-width:0}
+#yrsel{flex:0 0 auto;max-width:170px}
+#mosel{flex:1 1 auto}
+#mosel:disabled{opacity:.55}
+#chipsRow .cosel-box.flt{flex:0 0 auto}
+#dbPush,#logHist,#loadReopen,#empAdd,#csv,#logoutBtn{}
 body.loaded #logHist{display:inline-block}
 #dbPush{display:none}
 /* ===== история входа ===== */
@@ -470,13 +493,23 @@ body.loaded #loadReopen{display:inline-block}
       <button data-act="2" aria-pressed="false">Без дат</button>
       <button data-act="" aria-pressed="false">Все</button>
     </div>
-    <span id="userBadge" hidden></span>
-    <button class="btn" id="empAdd">+ Сотрудник</button>
-    <button class="btn" id="logHist" title="Кто и когда входил в дашборд">История входа</button>
-    <button class="btn" id="dbPush" title="Записать текущие данные в общую базу — после этого их увидят все">Сохранить базу</button>
-    <button class="btn" id="loadReopen">Загрузить файл</button>
-    <button class="btn" id="csv">Скачать Excel</button>
-    <button class="btn" id="logoutBtn" title="Сменить пользователя">Выйти</button>
+    <div class="menu-wrap">
+      <button class="btn burger" id="burger" aria-haspopup="true" aria-expanded="false" title="Меню">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div class="menu" id="menu" hidden>
+        <div class="menu-user" id="userBadge"></div>
+        <button class="menu-i" id="empAdd">Добавить сотрудника</button>
+        <button class="menu-i" id="csv">Скачать Excel</button>
+        <div class="menu-sep"></div>
+        <button class="menu-i" id="logHist">История входа</button>
+        <button class="menu-i" id="dbPush">Сохранить базу</button>
+        <button class="menu-i" id="loadReopen">Загрузить файл</button>
+        <div class="menu-sep"></div>
+        <button class="menu-i danger" id="logoutBtn">Выйти</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -489,7 +522,6 @@ body.loaded #loadReopen{display:inline-block}
       <label for="cosel">Компания</label>
       <select id="cosel"></select>
     </div>
-    <div class="copills" id="copills"></div>
   </div>
   <div class="cobar-in">
     <div class="cosel-box alt">
@@ -498,8 +530,8 @@ body.loaded #loadReopen{display:inline-block}
       </svg>
       <label for="yrsel">Период</label>
       <select id="yrsel"></select>
+      <select id="mosel" aria-label="Месяц"></select>
     </div>
-    <div class="copills" id="mopills"></div>
   </div>
   <div class="cobar-in" id="chipsRow">
     <div class="cosel-box flt">
@@ -1121,51 +1153,42 @@ function buildCoSelect(){
   YEARS=Object.keys(ys).sort().reverse();
   el("yrsel").innerHTML='<option value="">Весь период</option>'+
     YEARS.map(function(y){ return '<option value="'+y+'">'+y+' год</option>' }).join("");
+  /* месяцы — отдельным полем, кнопок-пилюль больше нет */
+  var MONF=["январь","февраль","март","апрель","май","июнь",
+            "июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+  el("mosel").innerHTML='<option value="">Весь год</option>'+
+    MONF.map(function(name,k){
+      var m2=(k<9?"0":"")+(k+1);
+      return '<option value="'+m2+'">'+name+'</option>';
+    }).join("");
 }
 function perPills(){
-  var dis = !F.yr;
-  el("mopills").innerHTML =
-    '<button class="pill mo'+(!F.mon?" on":"")+'" data-mo="">Весь год</button>'+
-    MON.map(function(name,i){
-      var mm=String(i+1).padStart(2,"0");
-      var on = F.mon && F.mon.slice(5)===mm;
-      return '<button class="pill mo'+(on?" on":"")+'" data-mo="'+mm+'"'+
-        (dis?' style="opacity:.5"':'')+' title="'+name+'">'+name+'</button>';
-    }).join("")+
-    (dis?'<span style="font-size:11.5px;color:var(--ink3);font-family:var(--mono)">выберите год — или нажмите месяц, возьмётся '+(YEARS[0]||"")+'</span>':"");
-  el("yrsel").value = F.yr||"";
+  /* кнопок больше нет: год и месяц выбираются двумя полями */
+  var y=el("yrsel"), m=el("mosel");
+  if(y) y.value = F.yr || "";
+  if(m){ m.value = F.mon ? F.mon.slice(5) : ""; m.disabled = !F.yr }
   el("scopePer").textContent = perLbl();
 }
 el("yrsel").addEventListener("change",function(e){
   F.yr = e.target.value || null;
-  F.mon = F.yr && F.mon ? F.yr+"-"+F.mon.slice(5) : null;
-  render();
+  F.mon = (F.yr && F.mon) ? F.yr+"-"+F.mon.slice(5) : null;
+  sc.scrollTop=0; render();
 });
-el("mopills").addEventListener("click",function(e){
-  var b=e.target.closest(".pill"); if(!b) return;
-  var mm=b.dataset.mo;
-  if(!mm){ F.mon=null; render(); return }
-  if(!F.yr) F.yr=YEARS[0]||null;
-  if(!F.yr) return;
-  var v=F.yr+"-"+mm;
-  F.mon = (F.mon===v? null : v);
-  render();
+el("mosel").addEventListener("change",function(e){
+  var mm=e.target.value;
+  if(!mm){ F.mon=null }
+  else {
+    if(!F.yr) F.yr = YEARS[0];                 /* месяц без года — берём свежий */
+    F.mon = F.yr+"-"+mm;
+  }
+  sc.scrollTop=0; render();
 });
+
 function coPills(){
-  var top=CO_ALL.slice(0,6);
-  el("copills").innerHTML =
-    '<button class="pill'+(F.co?"":" on")+'" data-co="">Все</button>'+
-    top.map(function(r){
-      return '<button class="pill'+(F.co===r[0]?" on":"")+'" data-co="'+esc(r[0])+'">'+
-        esc(r[0])+'</button>' }).join("")+
-    (CO_ALL.length>top.length?'<span style="font-size:11.5px;color:var(--ink3);font-family:var(--mono)">ещё '+(CO_ALL.length-top.length)+' — в списке слева</span>':"");
   el("cosel").value = F.co||"";
   el("scopeName").textContent = F.co ? F.co : "Все компании";
 }
-el("copills").addEventListener("click",function(e){
-  var b=e.target.closest(".pill"); if(!b) return;
-  F.co = b.dataset.co || null; render();
-});
+
 el("cosel").addEventListener("change",function(e){ F.co = e.target.value || null; render() });
 
 /* ============ рендер ============ */
@@ -2276,13 +2299,10 @@ function loadEdits(){
 
 window.__setUser = function(u){
   CURU = u || null;
-  var ub=el("userBadge"), lb=el("logoutBtn");
-  if(ub){
-    ub.hidden=!CURU;
-    ub.textContent = CURU ? (CURU.admin ? CURU.email+" · админ" : CURU.email) : "";
-  }
-  var adminOnly=[el("accLink"), el("loadReopen")];
-  adminOnly.forEach(function(b){ if(b) b.style.display=(CURU&&!CURU.admin)?"none":"" });
+  var ub=el("userBadge");
+  if(ub) ub.textContent = CURU ? (CURU.admin ? CURU.email+" · админ" : CURU.email) : "";
+  [el("loadReopen"), el("dbPush")].forEach(function(b){
+    if(b) b.style.display = (CURU && !CURU.admin) ? "none" : "" });
   if(window.__ALLP){
     P = (CURU && !CURU.admin) ? __userFilter(window.__ALLP, CURU) : window.__ALLP;
     __updMeta();
@@ -2851,7 +2871,7 @@ function closeLog(){
 function login(email,hash,save){
   var u=USERS[email];
   if(!u || u.h!==hash) return false;
-  if(save){ try{ sessionStorage.setItem("hr_auth", email+"|"+hash) }catch(e){} }
+  if(save){ try{ localStorage.setItem("hr_auth", email+"|"+hash) }catch(e){} }
   CUR={email:email, admin:!!u.a, hash:hash};
   if(save) logLogin(email,u.a,hash);     /* пишем только реальный вход, не восстановление вкладки */
   box.classList.add("off"); box.setAttribute("aria-hidden","true");
@@ -2868,6 +2888,20 @@ document.getElementById("authForm").addEventListener("submit",function(e){
            document.getElementById("authPwd").focus(); }
   else err.classList.remove("on");
 });
+/* ---- меню-бургер ---- */
+(function(){
+  var b=document.getElementById("burger"), m=document.getElementById("menu");
+  if(!b||!m) return;
+  function close(){ m.hidden=true; b.setAttribute("aria-expanded","false") }
+  function open(){ m.hidden=false; b.setAttribute("aria-expanded","true") }
+  b.addEventListener("click",function(e){ e.stopPropagation(); m.hidden?open():close() });
+  document.addEventListener("click",function(e){
+    if(!m.hidden && !m.contains(e.target) && e.target!==b) close();
+  });
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape") close() });
+  m.addEventListener("click",function(e){ if(e.target.closest(".menu-i")) close() });
+})();
+
 var pushBtn=document.getElementById("dbPush");
 if(pushBtn) pushBtn.addEventListener("click",function(){
   var push = window.__pushDataset;
@@ -2916,11 +2950,12 @@ document.getElementById("logClear").addEventListener("click",function(){
 
 var lb=document.getElementById("logoutBtn");
 if(lb) lb.addEventListener("click",function(){
-  try{ sessionStorage.removeItem("hr_auth") }catch(e){}
+  try{ localStorage.removeItem("hr_auth"); sessionStorage.removeItem("hr_auth") }catch(e){}
   location.reload();
 });
 try{
-  var s=sessionStorage.getItem("hr_auth");
+  /* вход запоминается и после закрытия браузера — до нажатия «Выйти» */
+  var s=localStorage.getItem("hr_auth") || sessionStorage.getItem("hr_auth");
   if(s){ var i=s.indexOf("|"); login(s.slice(0,i), s.slice(i+1), false); }
 }catch(e){}
 })();
