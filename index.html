@@ -422,12 +422,16 @@ body.loaded .menu-wrap{display:block}
 .menu-i:hover{background:var(--paper)}
 .menu-i.danger{color:var(--fire)}
 .menu-sep{height:1px;background:var(--line2);margin:4px 0}
-/* поля отбора шире — кнопки-пилюли убраны */
-.cosel-box{flex:1 1 auto;max-width:none}
-.cosel-box select{flex:1 1 auto;width:100%;min-width:0}
-#yrsel{flex:0 0 auto;max-width:170px}
-#mosel{flex:1 1 auto}
-#mosel:disabled{opacity:.55}
+/* кнопки-пилюли убраны: поля берут ширину по содержимому, не растягиваясь на всю строку */
+.cosel-box{flex:0 0 auto;max-width:100%}
+.cosel-box select{flex:0 0 auto;width:auto;min-width:0}
+#cosel{min-width:250px;max-width:340px}
+#yrsel{min-width:150px}
+#mosel{min-width:150px}
+#mosel:disabled{opacity:.5}
+.cosel-box.per{gap:6px}
+.cosel-box.per select+select{border-left:1px solid var(--line2);padding-left:12px;margin-left:4px}
+#chipsRow .cosel-box.flt{flex:0 0 auto;min-height:38px}
 #chipsRow .cosel-box.flt{flex:0 0 auto}
 #dbPush,#logHist,#loadReopen,#empAdd,#csv,#logoutBtn{}
 body.loaded #logHist{display:inline-block}
@@ -524,7 +528,7 @@ body.loaded #loadReopen{display:inline-block}
     </div>
   </div>
   <div class="cobar-in">
-    <div class="cosel-box alt">
+    <div class="cosel-box alt per">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
         <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke-linecap="round"/>
       </svg>
@@ -1108,6 +1112,7 @@ function sel(skip){ var o=[],i; for(i=0;i<P.length;i++){ if(match(P[i],skip)) o.
 function toggle(k,v){ F[k] = (F[k]===v ? null : v); render() }
 function setAct(v){
   F.act=v;
+  if(typeof ACT_BEFORE_SEARCH!=="undefined") ACT_BEFORE_SEARCH=null;
   Array.prototype.forEach.call(el("statseg").children,function(x){
     x.setAttribute("aria-pressed", x.dataset.act===v?"true":"false") });
   sc.scrollTop=0; render();
@@ -1326,6 +1331,7 @@ el("chips").addEventListener("click",function(e){
     F={q:"",act:"1",co:null,un:null,cat:null,ctr:null,gen:null,mgr:null,pos:null,
        yr:null,mon:null,age:null,ten:null};
     el("q").value="";
+    ACT_BEFORE_SEARCH=null;
     setAct("1"); return;                 /* setAct сам перерисует список и кнопки */
   }
   else if(k==="q"){ F.q=""; el("q").value="" }
@@ -1847,10 +1853,21 @@ document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeCard(
 
 /* ============ управление ============ */
 var t=null;
+var ACT_BEFORE_SEARCH=null;         /* к какому статусу вернуться, когда поиск снимут */
 el("q").addEventListener("input",function(e){
   clearTimeout(t); var v=fold(e.target.value.trim());
-  t=setTimeout(function(){ F.q=v; sc.scrollTop=0; render() },160);
+  t=setTimeout(function(){
+    /* пока ищут — показываем всех: и работающих, и уволенных, и без дат.
+       Иначе человек ищет фамилию, а его нет в списке просто из-за статуса. */
+    if(v && !F.q && F.act!==""){ ACT_BEFORE_SEARCH=F.act; F.act=""; syncSeg() }
+    else if(!v && ACT_BEFORE_SEARCH!=null){ F.act=ACT_BEFORE_SEARCH; ACT_BEFORE_SEARCH=null; syncSeg() }
+    F.q=v; sc.scrollTop=0; render();
+  },160);
 });
+function syncSeg(){
+  Array.prototype.forEach.call(el("statseg").children,function(x){
+    x.setAttribute("aria-pressed", x.dataset.act===F.act?"true":"false") });
+}
 el("statseg").addEventListener("click",function(e){
   var b=e.target.closest("button"); if(!b) return; setAct(b.dataset.act);
 });
