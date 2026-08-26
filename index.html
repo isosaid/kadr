@@ -474,6 +474,9 @@ body.loaded #logHist{display:inline-block}
   font:inherit;font-weight:400;color:var(--ink);background:#fff}
 .usr-grid select[multiple]{padding:4px}
 .usr-grid .hint{font-weight:400;font-size:11px;color:var(--ink3)}
+.usr-grid .u_add{display:flex;gap:8px;margin-top:6px}
+.usr-grid .u_add input{flex:1 1 auto}
+.usr-grid .u_add .btn{flex:0 0 auto;padding:8px 14px}
 .usr-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
 .usr-actions .btn.primary{background:var(--hire);color:#fff;border-color:var(--hire)}
 .usr-msg{margin-top:10px;font-size:12.5px;padding:8px 10px;border-radius:8px;display:none}
@@ -671,8 +674,9 @@ body.loaded #loadReopen{display:inline-block}
 <div id="auth" aria-hidden="false">
   <form class="auth-box" id="authForm">
     <h1>HR аналитика</h1>
-    <p class="sub">Вход по корпоративной почте</p>
-    <label>Почта<input id="authEmail" type="email" autocomplete="username" required></label>
+    <p class="sub">Вход по логину и паролю</p>
+    <label>Логин<input id="authEmail" type="text" autocomplete="username" required
+      placeholder="почта или имя пользователя"></label>
     <label>Пароль<input id="authPwd" type="password" autocomplete="current-password" required></label>
     <button type="submit">Войти</button>
     <div class="auth-err" id="authErr">Неверная почта или пароль</div>
@@ -707,14 +711,15 @@ body.loaded #loadReopen{display:inline-block}
   <p class="sub" id="usrSub"></p>
 
   <div class="usr-scroll"><table class="usr-tbl">
-    <thead><tr><th>Почта</th><th>Доступ</th><th></th></tr></thead>
+    <thead><tr><th>Логин</th><th>Доступ</th><th></th></tr></thead>
     <tbody id="usrRows"></tbody>
   </table></div>
 
   <form class="usr-form" id="usrForm">
     <h3 id="usrFormTitle">Новый пользователь</h3>
     <div class="usr-grid">
-      <label class="wide">Почта *<input id="u_mail" type="email" autocomplete="off" required></label>
+      <label class="wide">Логин *<input id="u_mail" type="text" autocomplete="off" required
+        placeholder="почта или короткое имя, например admin"></label>
       <label>Пароль<input id="u_pwd" type="text" autocomplete="off" placeholder="оставьте пустым — не менять"></label>
       <label>Роль
         <select id="u_role">
@@ -725,6 +730,11 @@ body.loaded #loadReopen{display:inline-block}
       <label class="wide" id="u_coWrap">Компании *
         <select id="u_co" multiple size="7"></select>
         <span class="hint">Держите Ctrl (на Mac — Cmd), чтобы выбрать несколько</span>
+        <span class="u_add">
+          <input id="u_coNew" type="text" autocomplete="off"
+                 placeholder="компании нет в списке — впишите название">
+          <button class="btn" type="button" id="u_coAdd">Добавить</button>
+        </span>
       </label>
     </div>
     <div class="usr-actions">
@@ -2914,7 +2924,7 @@ function sha256(s){
   return out;
 }
 
-var USERS={"kh.kaumov@avesto.tj": {"h": "05e86bdb34836ae1c42daced04223066784f9d4ef83779d348877763aa6745e1", "a": 1, "c": []}, "iso@avesto.tj": {"h": "817df3b5738ed0a2ead7a8ee7e3f2e29950501db51db02b0f02d737e6282bd40", "a": 1, "c": []}, "hrazot-tj@rambler.ru": {"h": "cb37d03ff69e898f4046e2a4603e45d26cd8a5b2154d35b30224b9a8000009cc", "a": 0, "c": ["Азот"]}, "m.saysharifova@arvis.tj": {"h": "d862e36b8b8f6ddbe345b78638db3fee3fb18cc6863a1378264d3abae5fe117e", "a": 0, "c": ["Арвис", "Арвис Зелал"]}, "hr.artel.avesto@gmail.com": {"h": "3996668787864549d20a1d2587b39e74a6704e7bb8218ef87c53332a8563057b", "a": 0, "c": ["Артел"]}, "hr@dushanbecity.tj": {"h": "a643fa233ce4349d9dfd9ce8e8625bfc74037df2446b948ec452b6035e6ebfaa", "a": 0, "c": ["Душанбе Сити", "ДС Маркет", "ДС Сугурта", "ДС Лизинг"]}, "shahnoza.mizrobova@akia-avesto.tj": {"h": "fac7cb94030ae91b3707aef671cb4b8ad58bd8c38f49231c1792b79c885ae3a6", "a": 0, "c": ["Акиа"]}, "hr.gulistoni.dushanbe@gmail.com": {"h": "2fa6c178b3ad33519ec09490ea12f79db7efa34e2fbf931ef8c3e21dc8b8d886", "a": 0, "c": ["Гулистони Душанбе"]}, "rrahmatulloev@doro.tj": {"h": "b47faff2bdb6a67633ec055d1631e35ee7b12df524cf421283cc422b77a63e1a", "a": 0, "c": ["Доро Молия"]}, "khalisamo.niyazmamadova@zet-mobile.com": {"h": "44bb0852f2491ee063d402d33cbc006e30f048dcdd5f02c794fbbbc8b4a0b101", "a": 0, "c": ["Зет мобайл"]}, "r.bakhtiyor@nets.tj": {"h": "ea23825fc3d0f3a33fdc4ef733365773285523bc31131eb75bc00412bc746886", "a": 0, "c": ["Нет Солюшенс"]}, "hrdep.kod@gmail.com": {"h": "0339eff23d6059119aacd63a40b7f7ef6aeaf74581b4c37868a93c4045cf0b90", "a": 0, "c": ["Комбинати Орд"]}, "hr.composite.tj@gmail.com": {"h": "39bc8e9a456eb9ef484d95cb3a056970ef04396fead388643ec506147b23019e", "a": 0, "c": ["Композит"]}, "info@composite.tj": {"h": "7e2d2d7d624f5efc7c830ca96a8a316e43659e32da0d7b6c38d17083edbb7a68", "a": 0, "c": ["Композит"]}, "hr@marmari.tj": {"h": "8de8ea28d1b9aa83143ad5ca37863eddcf7ac8d1c02158109ea1d63a3632a85b", "a": 0, "c": ["Мармари"]}, "muosirkadr@gmail.com": {"h": "fecc48d95aea4c9aef4ae5dff449420d38a590bddcba4a6227ade7e93e583421", "a": 0, "c": ["Муосир"]}, "hrsiyoma@gmail.com": {"h": "cb3a7de1a50e3c8051d30cb562ae82e0feedaf4589e2a1f7a7c9fb57653814c9", "a": 0, "c": ["Сиёма"]}, "azizakhon.b@siyomamall.tj": {"h": "7e3c940feb04f11107f9a11b61bde5f20d7dcaebd778e3bfe2173c872e9c66d6", "a": 0, "c": ["Сиёма Молл"]}, "hrcitycard01@gmail.com": {"h": "60d11e1a3d885aa732a55d913534ffddfa36969750b04c8c2bdb5b93b4f59710", "a": 0, "c": ["Сити кард", "Сити кард Хуҷанд"]}, "hr.cityline.avesto@gmail.com": {"h": "57e85b2d7e3ae3ab7b563bfce591e3b46f160e438ed2f7a2c708f7ef87d4da8a", "a": 0, "c": ["Сити Лайн"]}, "s.karimova@cityservice.tj": {"h": "55c832bf14a571fa8e15c3be976575bae03aee9736e5f6db57371a126609d074", "a": 0, "c": ["Сити Сервис"]}, "sh.gadoeva@avesto.tj": {"h": "101b83aedfb05c610d3d02b175cfff085c5bdc1234c5bcb635b56c68c0c6dba8", "a": 0, "c": ["Авесто", "Авесто Филиал"]}, "filizzot01@gmail.com": {"h": "42b4fd43257efc60e9b61d9d53cc503e5f93b86bb92183cb120da6a70c55a5c7", "a": 0, "c": ["Филиззот"]}, "hr.olucha@gmail.com": {"h": "861046d88346d895aaf78f2d1db231b78bbb395997b91b61851d067fcc1c8761", "a": 0, "c": ["Олуча"]}};
+var USERS={"kh.kaumov@avesto.tj": {"h": "05e86bdb34836ae1c42daced04223066784f9d4ef83779d348877763aa6745e1", "a": 1, "c": []}, "iso@avesto.tj": {"h": "817df3b5738ed0a2ead7a8ee7e3f2e29950501db51db02b0f02d737e6282bd40", "a": 1, "c": []}, "hrazot-tj@rambler.ru": {"h": "cb37d03ff69e898f4046e2a4603e45d26cd8a5b2154d35b30224b9a8000009cc", "a": 0, "c": ["Азот"]}, "m.saysharifova@arvis.tj": {"h": "d862e36b8b8f6ddbe345b78638db3fee3fb18cc6863a1378264d3abae5fe117e", "a": 0, "c": ["Арвис", "Арвис Зелал"]}, "hr.artel.avesto@gmail.com": {"h": "3996668787864549d20a1d2587b39e74a6704e7bb8218ef87c53332a8563057b", "a": 0, "c": ["Артел"]}, "hr@dushanbecity.tj": {"h": "a643fa233ce4349d9dfd9ce8e8625bfc74037df2446b948ec452b6035e6ebfaa", "a": 0, "c": ["Душанбе Сити", "ДС Маркет", "ДС Сугурта", "ДС Лизинг"]}, "shahnoza.mizrobova@akia-avesto.tj": {"h": "fac7cb94030ae91b3707aef671cb4b8ad58bd8c38f49231c1792b79c885ae3a6", "a": 0, "c": ["Акиа"]}, "hr.gulistoni.dushanbe@gmail.com": {"h": "2fa6c178b3ad33519ec09490ea12f79db7efa34e2fbf931ef8c3e21dc8b8d886", "a": 0, "c": ["Гулистони Душанбе"]}, "rrahmatulloev@doro.tj": {"h": "b47faff2bdb6a67633ec055d1631e35ee7b12df524cf421283cc422b77a63e1a", "a": 0, "c": ["Доро Молия"]}, "khalisamo.niyazmamadova@zet-mobile.com": {"h": "44bb0852f2491ee063d402d33cbc006e30f048dcdd5f02c794fbbbc8b4a0b101", "a": 0, "c": ["Зет мобайл"]}, "r.bakhtiyor@nets.tj": {"h": "ea23825fc3d0f3a33fdc4ef733365773285523bc31131eb75bc00412bc746886", "a": 0, "c": ["Нет Солюшенс"]}, "hrdep.kod@gmail.com": {"h": "0339eff23d6059119aacd63a40b7f7ef6aeaf74581b4c37868a93c4045cf0b90", "a": 0, "c": ["Комбинати Орд"]}, "hr.composite.tj@gmail.com": {"h": "39bc8e9a456eb9ef484d95cb3a056970ef04396fead388643ec506147b23019e", "a": 0, "c": ["Композит"]}, "info@composite.tj": {"h": "7e2d2d7d624f5efc7c830ca96a8a316e43659e32da0d7b6c38d17083edbb7a68", "a": 0, "c": ["Композит"]}, "hr@marmari.tj": {"h": "8de8ea28d1b9aa83143ad5ca37863eddcf7ac8d1c02158109ea1d63a3632a85b", "a": 0, "c": ["Мармари"]}, "muosirkadr@gmail.com": {"h": "fecc48d95aea4c9aef4ae5dff449420d38a590bddcba4a6227ade7e93e583421", "a": 0, "c": ["Муосир"]}, "hrsiyoma@gmail.com": {"h": "cb3a7de1a50e3c8051d30cb562ae82e0feedaf4589e2a1f7a7c9fb57653814c9", "a": 0, "c": ["Сиёма"]}, "azizakhon.b@siyomamall.tj": {"h": "7e3c940feb04f11107f9a11b61bde5f20d7dcaebd778e3bfe2173c872e9c66d6", "a": 0, "c": ["Сиёма Молл"]}, "hrcitycard01@gmail.com": {"h": "60d11e1a3d885aa732a55d913534ffddfa36969750b04c8c2bdb5b93b4f59710", "a": 0, "c": ["Сити кард", "Сити кард Хуҷанд"]}, "hr.cityline.avesto@gmail.com": {"h": "57e85b2d7e3ae3ab7b563bfce591e3b46f160e438ed2f7a2c708f7ef87d4da8a", "a": 0, "c": ["Сити Лайн"]}, "s.karimova@cityservice.tj": {"h": "55c832bf14a571fa8e15c3be976575bae03aee9736e5f6db57371a126609d074", "a": 0, "c": ["Сити Сервис"]}, "sh.gadoeva@avesto.tj": {"h": "101b83aedfb05c610d3d02b175cfff085c5bdc1234c5bcb635b56c68c0c6dba8", "a": 0, "c": ["Авесто", "Авесто Филиал"]}, "filizzot01@gmail.com": {"h": "42b4fd43257efc60e9b61d9d53cc503e5f93b86bb92183cb120da6a70c55a5c7", "a": 0, "c": ["Филиззот"]}, "hr.olucha@gmail.com": {"h": "861046d88346d895aaf78f2d1db231b78bbb395997b91b61851d067fcc1c8761", "a": 0, "c": ["Олуча"]}, "clo@anor.mobi": {"h": "46b0d868e07f9e08116a9ce6e89495542c89290d7a73550f1ff4962748579464", "a": 0, "c": ["ЧДММ Тоҷикмобайл (Анор)"]}};
 var box=document.getElementById("auth"), CUR=null;
 
 /* ---------- журнал входов (хранится в этом браузере) ---------- */
@@ -3084,9 +3094,10 @@ document.getElementById("authForm").addEventListener("submit",function(e){
     if(kind!=="err") setTimeout(function(){ m.className="usr-msg" },4000);
   }
   var ERR={ auth:"Неверный пароль или учётка отключена",
+            bad_login:"Логин: от 3 до 64 символов, без пробелов",
             forbidden:"Только администратор может менять пользователей",
             builtin:"Эта учётка задана в файле — её меняют через разработчика",
-            bad_email:"Проверьте адрес почты",
+
             no_password:"Для нового пользователя нужен пароль",
             no_companies:"Выберите хотя бы одну компанию",
             self:"Нельзя удалить самого себя",
@@ -3167,6 +3178,28 @@ document.getElementById("authForm").addEventListener("submit",function(e){
   document.addEventListener("keydown",function(e){
     if(e.key==="Escape" && modal.classList.contains("on")) close();
   });
+  /* компания, которой ещё нет в данных (например, новое предприятие холдинга):
+     добавляем её в список выбора вручную */
+  function addCompany(){
+    var inp=document.getElementById("u_coNew");
+    var name=inp.value.trim().replace(/\s+/g," ");
+    if(!name){ msg("Впишите название компании","err"); return }
+    var box=document.getElementById("u_co");
+    var have=[].slice.call(box.options).filter(function(o){
+      return o.value.toLowerCase()===name.toLowerCase() })[0];
+    if(have){ have.selected=true; inp.value=""; msg("Такая компания уже есть — она отмечена"); return }
+    var o=document.createElement("option");
+    o.value=name; o.textContent=name; o.selected=true;
+    box.appendChild(o);
+    if(!window.__ALL_COMPANIES) window.__ALL_COMPANIES=[];
+    window.__ALL_COMPANIES.push(name);
+    inp.value="";
+    msg("Компания добавлена в список: "+name);
+  }
+  document.getElementById("u_coAdd").addEventListener("click",addCompany);
+  document.getElementById("u_coNew").addEventListener("keydown",function(e){
+    if(e.key==="Enter"){ e.preventDefault(); addCompany() }
+  });
   document.getElementById("u_role").addEventListener("change",roleToggle);
   document.getElementById("u_reset").addEventListener("click",function(){ fillForm(null) });
   document.getElementById("u_gen").addEventListener("click",function(){
@@ -3194,7 +3227,8 @@ document.getElementById("authForm").addEventListener("submit",function(e){
     var adm=document.getElementById("u_role").value==="1";
     var cos=[].slice.call(document.getElementById("u_co").selectedOptions||[])
              .map(function(o){ return o.value });
-    if(!mail){ msg("Укажите почту","err"); return }
+    if(mail.length<3){ msg("Логин слишком короткий — минимум 3 символа","err"); return }
+    if(/\s/.test(mail)){ msg("В логине не должно быть пробелов","err"); return }
     if(!editing && !pass){ msg("Для нового пользователя нужен пароль","err"); return }
     if(!adm && !cos.length){ msg("Выберите компании","err"); return }
     var user={email:mail, a:adm?1:0, c:cos};

@@ -53,9 +53,10 @@ module.exports = async (req, res) => {
       return;
     }
 
+    // логином может быть и почта, и короткое имя вроде «admin»
     const email = String(body.user && body.user.email || "").trim().toLowerCase();
-    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      res.status(400).json({ error: "bad_email" }); return;
+    if (email.length < 3 || email.length > 64 || /\s/.test(email)) {
+      res.status(400).json({ error: "bad_login" }); return;
     }
     if (S.USERS[email]) {
       // встроенную учётку через форму не трогаем — только через файл
