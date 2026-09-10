@@ -1061,13 +1061,15 @@ function tenAt(p,co){
    Готовое p.ten считается от ПОСЛЕДНЕГО приёма, поэтому у тех, кто переходил
    между компаниями или возвращался, оно занижено — здесь считаем честно.
    Пересекающиеся периоды (работал в двух компаниях сразу) не удваиваем. */
-function tenHold(p){
-  if(p._th!==undefined) return p._th;
-  var ev=p.ev||[];
-  if(!ev.length){ p._th = (p.ten!=null?p.ten:null); return p._th }
+/* Периоды работы человека: [начало, конец]. Конец = TODAY, если ещё работает.
+   Считаем по числу одновременно открытых записей — у переведённых (Гузариш)
+   старая должность закрывается тем же днём, каким открыта новая. */
+function workIntervals(p,co){
+  var ev = co ? coEvents(p,co) : (p.ev||[]);
+  if(!ev.length) return [];
   var byCo={},i;
   for(i=0;i<ev.length;i++){
-    var c=ev[i][2]||"";
+    var c = co ? co : (ev[i][2]||"");
     (byCo[c]=byCo[c]||[]).push(ev[i]);
   }
   var iv=[];
@@ -1076,10 +1078,6 @@ function tenHold(p){
       if(x[0]!==y[0]) return x[0]<y[0]?-1:1;
       return (x[1]===HIRE?0:1)-(y[1]===HIRE?0:1);   /* приём раньше увольнения в один день */
     });
-    /* Считаем, сколько записей о работе открыто одновременно. У переведённых
-       (Гузариш) старая должность закрывается, а новая открыта с той же даты
-       приёма — при подсчёте «одной открытой записи» такой период терялся,
-       и общий стаж выходил меньше стажа в самой компании. */
     var depth=0, start=null;
     for(var j=0;j<a.length;j++){
       if(a[j][1]===HIRE){ if(depth===0) start=a[j][0]; depth++ }
@@ -1087,6 +1085,14 @@ function tenHold(p){
     }
     if(depth>0 && start!=null) iv.push([start, TODAY]);   /* ещё работает */
   });
+  return iv;
+}
+
+function tenHold(p){
+  if(p._th!==undefined) return p._th;
+  var ev=p.ev||[], i;
+  if(!ev.length){ p._th = (p.ten!=null?p.ten:null); return p._th }
+  var iv=workIntervals(p,null);
   if(!iv.length){ p._th=null; return null }
   iv.sort(function(x,y){ return x[0]<y[0]?-1:x[0]>y[0]?1:0 });
   var days=0, s=iv[0][0], e=iv[0][1];
@@ -1383,6 +1389,63 @@ function kpisStatic(){
 }
 
 /* Движение — всё, что зависит от выбранного года и месяца */
+/* Среднесписочная численность: среднее число людей в штате по месяцам периода.
+   Именно она — знаменатель классической текучести Кт = Ув / Кср × 100%.
+   Считаем разностным массивом по месяцам, а не перебором дат: людей тысячи. */
+function avgHeadcount(pool, a0, a1, co){
+  var mi=function(d){ return (+d.slice(0,4))*12 + (+d.slice(5,7)) - 1 };
+  var mEnd=function(idx){
+    var y=Math.floor(idx/12), m=idx%12+1;
+    var last=new Date(Date.UTC(y, m, 0)).getUTCDate();
+    return y+"-"+String(m).padStart(2,"0")+"-"+String(last).padStart(2,"0");
+  };
+  if(a1>TODAY) a1=TODAY;                       /* будущие месяцы в среднее не берём */
+  if(a1<a0) return {avg:0, months:0};
+  var lo=null, hi=null, all=[], i, j;
+  for(i=0;i<pool.length;i++){
+    var iv=workIntervals(pool[i], co||null);
+    if(!iv.length) continue;
+    /* человек, числящийся сразу в двух компаниях, — это всё равно один человек:
+       склеиваем его периоды, иначе среднесписочная завышается */
+    iv=iv.slice().sort(function(x,y){ return x[0]<y[0]?-1:x[0]>y[0]?1:0 });
+    var merged=[iv[0].slice()];
+    for(j=1;j<iv.length;j++){
+      var last=merged[merged.length-1];
+      if(iv[j][0]<=last[1]){ if(iv[j][1]>last[1]) last[1]=iv[j][1] }
+      else merged.push(iv[j].slice());
+    }
+    for(j=0;j<merged.length;j++){
+      var s=merged[j][0], e=merged[j][1];
+      if(e<a0 || s>a1) continue;                 /* период не пересекается */
+      all.push([s<a0?a0:s, e>a1?a1:e]);
+      var si=mi(all[all.length-1][0]), ei=mi(all[all.length-1][1]);
+      if(lo==null || si<lo) lo=si;
+      if(hi==null || ei>hi) hi=ei;
+    }
+  }
+  if(lo==null) return {avg:0, months:0};
+  /* незакрытый месяц (сегодня ещё не его конец) в среднее не берём — иначе он
+     считался бы пустым и занижал Кср */
+  var lastFull=mi(a1);
+  if(mEnd(lastFull)>a1) lastFull--;
+  if(hi>lastFull) hi=lastFull;
+  if(hi<lo) return {avg:0, months:0};
+  var len=hi-lo+1, diff=new Array(len+1);
+  for(i=0;i<=len;i++) diff[i]=0;
+  for(i=0;i<all.length;i++){
+    /* человек считается в месяце, если работал на конец этого месяца */
+    var s2=mi(all[i][0]), e2=mi(all[i][1]);
+    var from=s2, to=e2;
+    if(all[i][0] > mEnd(s2)) from=s2+1;           /* принят после конца месяца — не в счёт */
+    if(all[i][1] < mEnd(e2)) to=e2-1;             /* уволен до конца месяца — не в счёт */
+    if(to<from) continue;
+    diff[from-lo]++; diff[to-lo+1]--;
+  }
+  var run=0, sum=0, months=0;
+  for(i=0;i<len;i++){ run+=diff[i]; sum+=run; months++ }
+  return {avg: months? sum/months : 0, months: months};
+}
+
 function kpisFlow(){
   var pool=sel("act,mon"), i, j, p;
   var b=perBounds(), a0=b[0], a1=b[1];
@@ -1411,8 +1474,13 @@ function kpisFlow(){
     : (F.mon? "выбран один месяц — снимите его, чтобы увидеть пик" : "нет событий в периоде");
   var net=hires-fires;
   var per = "за "+perLbl();
-  /* текучесть = уволенные / все, кто числился в этом периоде (а не к принятым) */
-  var turn = base ? Math.round(fires/base*1000)/10 : null;
+  /* Кт = Уволено / Среднесписочная × 100% — стандартная формула кадровой отчётности */
+  /* за всю историю текучесть не считают: числитель копится годами,
+     а знаменатель — это численность одного момента */
+  var whole = !F.yr && !F.mon;
+  var hc = whole ? {avg:0,months:0} : avgHeadcount(pool, a0, a1, (F.co||null));
+  var kcp = Math.round(hc.avg);
+  var turn = (!whole && kcp) ? Math.round(fires/kcp*1000)/10 : null;
   el("perNote").textContent = per;
   X.base=base; X.per=per;                       /* уехало в «Эксперименты» */
   el("kpisB").innerHTML = kpiHtml([
@@ -1420,7 +1488,8 @@ function kpisFlow(){
     ["Уволено", n(fires), "событий увольнения "+per, "dn"],
     ["Приём − увольнения", (net>0?"+":"")+n(net), "разница событий "+per, net>=0?"up":"dn"],
     ["Текучесть", turn==null?"—":String(turn).replace(".",",")+"%",
-      n(fires)+" уволенных из "+n(base)+" работавших "+per, ""],
+      whole ? "выберите год или месяц — за всю историю показатель не считается"
+            : n(fires)+" уволенных · среднесписочная "+n(kcp)+" "+per, ""],
     ["Пиковый месяц найма", peakVal, peakSub, ""]
   ]);
 }
