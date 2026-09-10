@@ -1072,13 +1072,20 @@ function tenHold(p){
   }
   var iv=[];
   Object.keys(byCo).forEach(function(c){
-    var a=byCo[c].slice().sort(function(x,y){ return x[0]<y[0]?-1:x[0]>y[0]?1:0 });
-    var open=null;
+    var a=byCo[c].slice().sort(function(x,y){
+      if(x[0]!==y[0]) return x[0]<y[0]?-1:1;
+      return (x[1]===HIRE?0:1)-(y[1]===HIRE?0:1);   /* приём раньше увольнения в один день */
+    });
+    /* Считаем, сколько записей о работе открыто одновременно. У переведённых
+       (Гузариш) старая должность закрывается, а новая открыта с той же даты
+       приёма — при подсчёте «одной открытой записи» такой период терялся,
+       и общий стаж выходил меньше стажа в самой компании. */
+    var depth=0, start=null;
     for(var j=0;j<a.length;j++){
-      if(a[j][1]===HIRE){ if(open==null) open=a[j][0] }
-      else if(open!=null){ iv.push([open,a[j][0]]); open=null }
+      if(a[j][1]===HIRE){ if(depth===0) start=a[j][0]; depth++ }
+      else if(depth>0){ depth--; if(depth===0 && start!=null){ iv.push([start,a[j][0]]); start=null } }
     }
-    if(open!=null) iv.push([open, TODAY]);      /* ещё работает — считаем по сегодня */
+    if(depth>0 && start!=null) iv.push([start, TODAY]);   /* ещё работает */
   });
   if(!iv.length){ p._th=null; return null }
   iv.sort(function(x,y){ return x[0]<y[0]?-1:x[0]>y[0]?1:0 });
