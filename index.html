@@ -1609,6 +1609,8 @@ function dash(){
     {colors:["#2E7DA8","#A8546E","#7B8A92"],donut:true,sub:"чел.",limit:4}));
   h.push(fbarCard("Возраст","age",orderBy(sel("age"),ageB,AGE.map(function(t){return t[0]})),"Клик по строке — фильтр."));
   h.push(fbarCard("Стаж","ten",orderBy(sel("ten"),function(p){return tenBAt(p,F.co)},TEN.map(function(t){return t[0]})),"Клик по строке — фильтр."+(F.co?" Стаж — в «"+F.co+"».":"")));
+  h.push(chartCard("Категория","cat",countBy(sel("cat"),function(p){return catAt(p,F.co)}),6));
+  h.push(chartCard("Оформление","ctr",countBy(sel("ctr"),function(p){return ctrAt(p,F.co)}),6,true));
   el("dash").innerHTML=h.filter(Boolean).join("");
 }
 /* подтянуть выбранную строку в зону видимости — и в списке полос, и в легенде пирога.
@@ -1640,8 +1642,6 @@ function charts(){
   g.push(chartCard("Подразделения","un",countBy(sel("un"),function(p){return unAt(p,F.co)}),10));
   g.push(chartCard("Должности","pos",countBy(sel("pos"),function(p){return posAt(p,F.co)}),10));
   g.push(chartCard("Руководители","mgr",countBy(sel("mgr"),function(p){return mgrAt(p,F.co)}),10));
-  g.push(chartCard("Категория","cat",countBy(sel("cat"),function(p){return catAt(p,F.co)}),6));
-  g.push(chartCard("Оформление","ctr",countBy(sel("ctr"),function(p){return ctrAt(p,F.co)}),6,true));
   el("charts2").innerHTML=g.filter(Boolean).join("");
   if(F.co && el("secLab").open) scrollToPicked(el("charts2"));
 }
