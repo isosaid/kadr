@@ -940,12 +940,19 @@ function cos(p){
   }
   p._cos=a; return a;
 }
+/* Компания, показанная в строке списка: выбранная в фильтре, иначе текущая.
+   По ней же идёт сортировка — иначе список выглядел бы перемешанным. */
+function coMain(p){
+  var a=cos(p);
+  if(!a.length) return null;
+  if(a.length===1) return a[0];
+  return (F.co && a.indexOf(F.co)>=0) ? F.co : (p.co||a[a.length-1]);
+}
 function coLabel(p){
   var a=cos(p);
   if(!a.length) return "—";
   if(a.length===1) return esc(a[0]);
-  var cur = (F.co && a.indexOf(F.co)>=0) ? F.co : (p.co||a[a.length-1]);
-  return esc(cur)+'<span class="multi">+'+(a.length-1)+'</span>';
+  return esc(coMain(p))+'<span class="multi">+'+(a.length-1)+'</span>';
 }
 
 /* ============ пол: м/М и ж/Ж/з/З — одно и то же ============ */
@@ -1932,18 +1939,25 @@ function sortView(){
   var rank={1:0,0:1,2:2};                       /* работает → уволен → без дат */
   VIEW.sort(function(a,b){
     var x,y;
-    if(k==="co"){ x=cos(a)[0]||null; y=cos(b)[0]||null }
+    if(k==="co"){ x=coMain(a); y=coMain(b) }
     else if(k==="hd"){ x=F.co?hdAt(a,F.co):a.hd; y=F.co?hdAt(b,F.co):b.hd }
     else if(k==="ten"){ x=F.co?tenAt(a,F.co):tenHold(a); y=F.co?tenAt(b,F.co):tenHold(b) }
     else if(k==="act"){ x=rank[stAt(a,F.co)]; y=rank[stAt(b,F.co)] }
     else { x=a[k]; y=b[k] }
-    if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1;
-    if(typeof x==="number") return (x-y)*d;
+    if(x==null&&y==null) return String(a.fio||"").localeCompare(String(b.fio||""),"ru");
+    if(x==null) return 1; if(y==null) return -1;
+    if(typeof x==="number"){
+      if(x!==y) return (x-y)*d;
+      return String(a.fio||"").localeCompare(String(b.fio||""),"ru");
+    }
     /* записи без нормальной фамилии («* Умедҷони Шариф», «- Ҳисайни Ғафор»)
        уводим в конец списка, а не в начало — при любом направлении сортировки */
     var xa=startsLetter(x), ya=startsLetter(y);
     if(xa!==ya) return xa ? -1 : 1;
-    return String(x).localeCompare(String(y),"ru")*d;
+    var r=String(x).localeCompare(String(y),"ru")*d;
+    if(r!==0) return r;
+    /* внутри одинакового значения — по алфавиту, чтобы порядок не прыгал */
+    return String(a.fio||"").localeCompare(String(b.fio||""),"ru");
   });
   Array.prototype.forEach.call(el("cols").children,function(b){
     b.classList.toggle("srt",b.dataset.k===SORT.k);
