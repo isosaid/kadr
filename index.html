@@ -795,8 +795,70 @@ function computeDMax(){
     for(j=0;j<ev.length;j++){ var d=ev[j][0]; if(d && (m===null || d>m)) m=d } }
   DMAX = m || new Date().toISOString().slice(0,10);
 }
+/* «Мутахассис» и «мутахассис», «Расмӣ» и «расмӣ» — одно и то же, просто набрано
+   по-разному. Сводим такие написания к одному: берём самое частое, при равенстве —
+   то, что с заглавной. Правим прямо в данных, поэтому чинится сразу везде:
+   в списке, карточке, фильтрах, разрезах и выгрузках. */
+function unifySpelling(payload){
+  var people=payload.people||[], dict=payload.cfd||[];
+  var norm=function(s){ return String(s).trim().replace(/\s+/g," ").toLowerCase() };
+  var FIELDS=["cat","ctr","pos","un","mgr"], SHORT={c:"cat",t:"ctr",p:"pos",u:"un",m:"mgr"};
+  var freq={}, i, j, k;
+
+  var bump=function(v){
+    if(!v) return;
+    var key=norm(v);
+    if(!key) return;
+    (freq[key]=freq[key]||{})[v]=(freq[key][v]||0)+1;
+  };
+  for(i=0;i<people.length;i++){
+    var p=people[i];
+    for(j=0;j<FIELDS.length;j++) bump(p[FIELDS[j]]);
+    var cf=p.cf;
+    if(cf) for(var co in cf){ var r=cf[co];
+      for(k in r){ if(!SHORT[k]) continue;
+        var v=typeof r[k]==="string" ? r[k] : dict[r[k]];
+        bump(v);
+      } }
+  }
+
+  /* Написание с заглавной предпочитаем всегда: должности и категории в кадровых
+     документах пишут с прописной, и список выглядит ровно. Между несколькими
+     такими вариантами выбираем самый частый. */
+  var CAP=/^[A-ZА-ЯЁӮҒҲӢҶҚ]/;
+  var best={}, n=0;
+  for(var key in freq){
+    var vars=freq[key], top=null, topN=-1, topCap=false;
+    for(var v in vars){
+      var c=vars[v], cap=CAP.test(v);
+      var better = (cap && !topCap) || (cap===topCap && c>topN);
+      if(top==null || better){ top=v; topN=c; topCap=cap }
+    }
+    best[key]=top;
+    if(Object.keys(vars).length>1) n++;
+  }
+  if(!n) return;                       /* разнобоя нет — ничего не трогаем */
+
+  /* словарь правим на месте: индексы в записях остаются прежними */
+  for(i=0;i<dict.length;i++){
+    var d=dict[i];
+    if(d && best[norm(d)]) dict[i]=best[norm(d)];
+  }
+  for(i=0;i<people.length;i++){
+    var q=people[i];
+    for(j=0;j<FIELDS.length;j++){
+      var val=q[FIELDS[j]];
+      if(val && best[norm(val)]) q[FIELDS[j]]=best[norm(val)];
+    }
+    var cf2=q.cf;
+    if(cf2) for(var co2 in cf2){ var r2=cf2[co2];
+      for(k in r2){ if(typeof r2[k]==="string" && best[norm(r2[k])]) r2[k]=best[norm(r2[k])] } }
+  }
+}
+
 function boot(payload){
   CFD = payload.cfd || [];
+  unifySpelling(payload);
   window.__META_GEN = payload.generated || "";
   window.__META_SRC = payload.source || "";
   window.__ALLP = payload.people||[];
