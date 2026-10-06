@@ -279,6 +279,26 @@ details.sec .grid{margin-top:0}
 .st.a{background:var(--hire-bg);color:var(--hire)}
 .st.f{background:var(--fire-bg);color:var(--fire)}
 .st.u{background:#E6EAE8;color:#6B7A82}
+/* ---------- дни рождения ---------- */
+.bdbox{background:var(--surface);border:1px solid var(--line);margin-top:12px;
+  max-height:300px;overflow:auto}
+.bdday{display:grid;grid-template-columns:86px 1fr;gap:12px;padding:9px 14px;
+  border-bottom:1px solid var(--line2);align-items:start}
+.bdday:last-child{border-bottom:0}
+.bdday.today{background:var(--hire-bg)}
+.bdd{font-family:var(--mono);font-size:11px;font-variant-numeric:tabular-nums;
+  color:var(--ink2);padding-top:3px;white-space:nowrap}
+.bdday.today .bdd{color:var(--hire);font-weight:600}
+.bdd em{display:block;font-style:normal;font-size:9.5px;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--ink3)}
+.bdlist{display:flex;flex-wrap:wrap;gap:6px}
+.bdp{display:inline-flex;align-items:baseline;gap:6px;cursor:pointer;
+  background:#F5F8F7;border:1px solid var(--line2);border-radius:var(--r);
+  padding:3px 8px;font-size:12.5px;color:var(--ink);text-align:left}
+.bdp:hover{background:#E9F1EE;border-color:var(--line)}
+.bdp b{font-weight:500}
+.bdp span{font-family:var(--mono);font-size:10.5px;color:var(--ink3);white-space:nowrap}
+.bdbox .empty{padding:22px 14px}
 .empty{padding:56px 20px;text-align:center;color:var(--ink3)}
 .empty b{display:block;color:var(--ink);font-size:14px;margin-bottom:5px}
 
@@ -599,6 +619,9 @@ body.loaded #loadReopen{display:inline-block}
 
     <div class="lbl">Профиль компании <span class="note">— на сегодня, период не влияет</span></div>
     <div class="kpis stat" id="kpisA"></div>
+
+    <div class="lbl">Дни рождения <span class="note" id="bdNote">— ближайшие 14 дней</span></div>
+    <div class="bdbox" id="bdBox"></div>
 
     <div class="lbl">Движение <span class="note" id="perNote">за весь период</span></div>
     <div class="kpis" id="kpisB"></div>
@@ -1506,7 +1529,89 @@ el("cosel").addEventListener("change",function(e){ F.co = e.target.value || null
 
 /* ============ рендер ============ */
 var VIEW=[], SORT={k:"fio",dir:1};
-function render(){ VIEW=sel(null); sortView(); coPills(); perPills(); kpis(); chips(); dash(); dashCo(); charts(); lab(); ribbon(); table() }
+function render(){ VIEW=sel(null); sortView(); coPills(); perPills(); kpis(); chips(); dash(); dashCo(); bdays(); charts(); lab(); ribbon(); table() }
+
+/* ============ дни рождения: ближайшие 14 дней ============
+   Берём НАСТОЯЩУЮ сегодняшнюю дату, а не TODAY (дату сборки выгрузки): поздравлять
+   нужно сегодня, а выгрузка могла быть собрана месяц назад.
+   Показываем только действующих и только по выбранной компании — у кого в этой
+   компании открыта запись. Период и переключатель статуса не влияют. */
+var BD_DAYS=14, BDLIST=[];
+var WD=["вс","пн","вт","ср","чт","пт","сб"];
+function bdKey(d){ return String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0") }
+function bdays(){
+  var box=el("bdBox"); if(!box) return;
+  var now=new Date(); now.setHours(0,0,0,0);
+  /* 29 февраля в невисокосный год отмечаем 1 марта */
+  var leap=function(y){ return (y%4===0 && y%100!==0) || y%400===0 };
+  var want={}, i, dts=[];
+  for(i=0;i<=BD_DAYS;i++){
+    var d=new Date(now.getTime()+i*86400000);
+    var k=bdKey(d);
+    (want[k]=want[k]||[]).push(i);
+    if(k==="03-01" && !leap(d.getFullYear())) (want["02-29"]=want["02-29"]||[]).push(i);
+    dts.push(d);
+  }
+  /* берём не sel(): блок не должен сужаться поиском, периодом и разрезами —
+     он отвечает на один вопрос «кого поздравить», и ответ зависит только
+     от выбранной компании и от того, что человек сейчас работает */
+  var pool=P, out=[];
+  for(i=0;i<pool.length;i++){
+    var p=pool[i];
+    if(!p.bd || p.bd.length<10) continue;
+    if(F.co && cos(p).indexOf(F.co)<0) continue;
+    if(stAt(p,F.co)!==1) continue;                 /* только действующие (в выбранной компании) */
+    var off=want[p.bd.slice(5,10)];
+    if(!off) continue;
+    var dd=dts[off[0]];
+    var age=dd.getFullYear()-(+p.bd.slice(0,4));
+    if(age<0 || age>100) continue;                 /* явная ошибка в дате */
+    out.push({p:p, off:off[0], age:age});
+  }
+  out.sort(function(a,b){
+    if(a.off!==b.off) return a.off-b.off;
+    return String(a.p.fio).localeCompare(String(b.p.fio),"ru");
+  });
+  BDLIST=out;
+  el("bdNote").textContent = "— ближайшие "+BD_DAYS+" дней · действующие"+
+    (F.co ? " · "+F.co : "")+" · "+
+    (out.length ? n(out.length)+" "+plurPeople(out.length) : "никого");
+  if(!out.length){
+    box.innerHTML='<div class="empty"><b>Именинников нет</b>'+
+      'В ближайшие '+BD_DAYS+' дней дней рождения не будет'+
+      (F.co? " в компании «"+esc(F.co)+"»" : "")+'.</div>';
+    return;
+  }
+  var html=[], cur=-1, open=false, idx=0;
+  out.forEach(function(r){
+    if(r.off!==cur){
+      if(open) html.push("</div></div>");
+      cur=r.off; open=true;
+      var d=dts[cur];
+      var lbl = cur===0 ? "сегодня" : (cur===1 ? "завтра" : WD[d.getDay()]);
+      html.push('<div class="bdday'+(cur===0?" today":"")+'">'+
+        '<div class="bdd">'+String(d.getDate()).padStart(2,"0")+"."+
+        String(d.getMonth()+1).padStart(2,"0")+'<em>'+lbl+'</em></div><div class="bdlist">');
+    }
+    html.push('<button class="bdp" data-b="'+(idx++)+'" title="'+esc(r.p.fio)+
+      (r.p.co?" · "+esc(r.p.co):"")+'"><b>'+esc(shortFio(r.p.fio))+'</b>'+
+      '<span>'+r.age+'</span></button>');
+  });
+  if(open) html.push("</div></div>");
+  box.innerHTML=html.join("");
+}
+function plurPeople(k){ var a=k%100, b=a%10;
+  return (a>10&&a<20)?"человек":(b===1?"человек":(b>1&&b<5?"человека":"человек")) }
+/* «Иванов Иван Иванович» -> «Иванов Иван И.» — чтобы помещалось в плитку */
+function shortFio(f){
+  var a=String(f||"").trim().split(/\s+/);
+  if(a.length<3) return f;
+  return a[0]+" "+a[1]+" "+a[2].charAt(0)+".";
+}
+el("bdBox").addEventListener("click",function(e){
+  var b=e.target.closest(".bdp"); if(!b) return;
+  var r=BDLIST[+b.dataset.b]; if(r) openCard(r.p, F.co||null);
+});
 
 /* --- KPI --- */
 var X={};   /* показатели, вынесенные в «Эксперименты» */
