@@ -618,9 +618,6 @@ body.loaded #loadReopen{display:inline-block}
     <div class="lbl">Профиль компании <span class="note">— на сегодня, период не влияет</span></div>
     <div class="kpis stat" id="kpisA"></div>
 
-    <div class="lbl">Дни рождения <span class="note" id="bdNote">— ближайшие 7 дней</span></div>
-    <div class="grid" id="bdBox"></div>
-
     <div class="lbl">Движение <span class="note" id="perNote">за весь период</span></div>
     <div class="kpis" id="kpisB"></div>
 
@@ -1527,7 +1524,7 @@ el("cosel").addEventListener("change",function(e){ F.co = e.target.value || null
 
 /* ============ рендер ============ */
 var VIEW=[], SORT={k:"fio",dir:1};
-function render(){ VIEW=sel(null); sortView(); coPills(); perPills(); kpis(); chips(); dash(); dashCo(); bdays(); charts(); lab(); ribbon(); table() }
+function render(){ VIEW=sel(null); sortView(); coPills(); perPills(); kpis(); chips(); dash(); dashCo(); charts(); lab(); ribbon(); table() }
 
 /* ============ дни рождения: ближайшие 14 дней ============
    Берём НАСТОЯЩУЮ сегодняшнюю дату, а не TODAY (дату сборки выгрузки): поздравлять
@@ -1538,8 +1535,7 @@ var BD_DAYS=7, BD_I=0, BDLIST=[];
 var WDS=["вс","пн","вт","ср","чт","пт","сб"];
 var MONS=["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
 function bdKey(d){ return String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0") }
-function bdays(){
-  var box=el("bdBox"); if(!box) return;
+function bdCard(){
   var now=new Date(); now.setHours(0,0,0,0);
   var leap=function(y){ return (y%4===0 && y%100!==0) || y%400===0 };
   var want={}, dts=[], i;
@@ -1569,22 +1565,19 @@ function bdays(){
     return String(x.p.fio).localeCompare(String(y.p.fio),"ru");
   });
   BDLIST=out;
-  el("bdNote").textContent = "— ближайшие "+BD_DAYS+" дней · действующие"+
-    (F.co ? " · "+F.co : "")+" · "+(out.length ? n(out.length)+" "+plurPeople(out.length) : "никого");
-
   if(!out.length){
-    box.innerHTML='<div class="card"><h3>Дни рождения</h3>'+
+    return '<div class="card"><h3>Дни рождения</h3>'+
       '<p class="hint">В ближайшие '+BD_DAYS+' дней именинников нет'+
       (F.co? " в компании «"+esc(F.co)+"»" : "")+'.</p></div>';
-    return;
   }
   if(BD_I>=out.length || BD_I<0) BD_I=0;
   var r=out[BD_I], d=r.d;
   var when = r.off===0 ? "сегодня" : (r.off===1 ? "завтра"
              : WDS[d.getDay()]+", "+d.getDate()+" "+MONS[d.getMonth()]);
   var co = F.co ? "" : (coMain(r.p) ? " · "+coMain(r.p) : "");
-  box.innerHTML='<div class="card bdcard"><h3>Дни рождения</h3>'+
-    '<p class="hint">Клик по строке — следующий именинник.</p>'+
+  return '<div class="card bdcard"><h3>Дни рождения</h3>'+
+    '<p class="hint">Ближайшие '+BD_DAYS+' дней · '+n(out.length)+' '+plurPeople(out.length)+
+      '. Клик по строке — следующий.</p>'+
     '<button class="bdone'+(r.off===0?" today":"")+'" id="bdOne" title="'+esc(r.p.fio)+'">'+
       '<span class="nm">'+esc(r.p.fio)+
         '<span class="sub">'+esc(when+co)+'</span></span>'+
@@ -1603,9 +1596,9 @@ function plurYears(k){ var a=k%100, b=a%10;
 function bdStep(k){
   if(!BDLIST.length) return;
   BD_I=(BD_I+k+BDLIST.length)%BDLIST.length;   /* по кругу */
-  bdays();
+  dash();                                      /* карточка живёт в сетке «Разрезы» */
 }
-el("bdBox").addEventListener("click",function(e){
+el("dash").addEventListener("click",function(e){
   var nav=e.target.closest("[data-nav]");
   if(nav){ bdStep(+nav.dataset.nav); return }
   if(e.target.closest("[data-open]")){
@@ -1961,6 +1954,7 @@ function dash(){
   h.push(fbarCard("Стаж","ten",orderBy(sel("ten"),function(p){return tenBAt(p,F.co)},TEN.map(function(t){return t[0]})),"Клик по строке — фильтр."+(F.co?" Стаж — в «"+F.co+"».":"")));
   h.push(chartCard("Категория","cat",countBy(sel("cat"),function(p){return catAt(p,F.co)}),6));
   h.push(chartCard("Оформление","ctr",countBy(sel("ctr"),function(p){return ctrAt(p,F.co)}),6,true));
+  h.push(bdCard());                     /* дни рождения — такой же разрез */
   el("dash").innerHTML=h.filter(Boolean).join("");
 }
 /* подтянуть выбранную строку в зону видимости — и в списке полос, и в легенде пирога.
