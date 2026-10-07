@@ -279,19 +279,24 @@ details.sec .grid{margin-top:0}
 .st.a{background:var(--hire-bg);color:var(--hire)}
 .st.f{background:var(--fire-bg);color:var(--fire)}
 .st.u{background:#E6EAE8;color:#6B7A82}
-/* ---------- дни рождения ---------- */
-.bdtabs{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 10px}
-.bdtab{display:inline-flex;align-items:baseline;gap:5px;border:1px solid var(--line2);
-  background:#F5F7F6;border-radius:2px;padding:4px 8px;cursor:pointer;font:inherit;
-  font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--ink2)}
-.bdtab:hover{background:#E9F1EE;border-color:var(--line)}
-.bdtab.on{background:var(--hire);border-color:var(--hire);color:#fff}
-.bdtab.zero{opacity:.45;cursor:default}
-.bdtab.zero:hover{background:#F5F7F6;border-color:var(--line2)}
-.bdtab b{font-weight:600;font-variant-numeric:tabular-nums}
-.bdcard .day{margin:0 0 9px;font-size:11px;color:var(--ink3)}
-.bdname{text-align:left}
-.bdage{font-family:var(--mono);font-size:11px;color:var(--ink3);white-space:nowrap}
+/* ---------- дни рождения: один именинник, клик — следующий ---------- */
+.bdone{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;
+  width:100%;border:0;background:#F5F7F6;border-radius:2px;padding:9px 11px;
+  font:inherit;text-align:left;cursor:pointer}
+.bdone:hover{background:#E9F1EE}
+.bdone.today{background:var(--hire-bg)}
+.bdone .nm{font-size:13px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bdone .sub{display:block;font-size:10.5px;color:var(--ink3);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bdone.today .sub{color:var(--hire)}
+.bdone .ag{font-family:var(--mono);font-size:11px;color:var(--ink2);white-space:nowrap}
+.bdnav{display:flex;align-items:center;gap:6px;margin-top:8px}
+.bdnav button{border:1px solid var(--line2);background:#fff;border-radius:2px;
+  width:24px;height:22px;cursor:pointer;color:var(--ink2);font:inherit;line-height:1;padding:0}
+.bdnav button:hover{background:#F5F7F6;border-color:var(--line)}
+.bdnav .pos{font-family:var(--mono);font-size:10.5px;color:var(--ink3);
+  font-variant-numeric:tabular-nums}
+.bdnav .open{margin-left:auto;width:auto;padding:0 8px;font-size:11px}
 .empty{padding:56px 20px;text-align:center;color:var(--ink3)}
 .empty b{display:block;color:var(--ink);font-size:14px;margin-bottom:5px}
 
@@ -1529,11 +1534,9 @@ function render(){ VIEW=sel(null); sortView(); coPills(); perPills(); kpis(); ch
    нужно сегодня, а выгрузка могла быть собрана месяц назад.
    Показываем только действующих и только по выбранной компании — у кого в этой
    компании открыта запись. Период и переключатель статуса не влияют. */
-var BD_DAYS=7, BD_SEL=0, BDLIST=[];
-var WD=["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"];
+var BD_DAYS=7, BD_I=0, BDLIST=[];
 var WDS=["вс","пн","вт","ср","чт","пт","сб"];
-var MONR=["января","февраля","марта","апреля","мая","июня","июля","августа",
-          "сентября","октября","ноября","декабря"];
+var MONS=["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
 function bdKey(d){ return String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0") }
 function bdays(){
   var box=el("bdBox"); if(!box) return;
@@ -1547,10 +1550,9 @@ function bdays(){
     if(k==="03-01" && !leap(d.getFullYear()) && want["02-29"]===undefined) want["02-29"]=i;
     dts.push(d);
   }
-  /* блок не должен сужаться поиском, периодом и разрезами — он отвечает на один
-     вопрос «кого поздравить», и зависит только от выбранной компании */
-  var byDay=[], total=0;
-  for(i=0;i<BD_DAYS;i++) byDay.push([]);
+  /* блок не сужается поиском, периодом и разрезами: он отвечает на один вопрос
+     «кого поздравить» и зависит только от выбранной компании */
+  var out=[];
   for(i=0;i<P.length;i++){
     var p=P[i];
     if(!p.bd || p.bd.length<10) continue;
@@ -1560,58 +1562,57 @@ function bdays(){
     if(off===undefined) continue;
     var age=dts[off].getFullYear()-(+p.bd.slice(0,4));
     if(age<0 || age>100) continue;                 /* явная ошибка в дате */
-    byDay[off].push({p:p, age:age}); total++;
+    out.push({p:p, off:off, age:age, d:dts[off]});
   }
-  byDay.forEach(function(a){
-    a.sort(function(x,y){ return String(x.p.fio).localeCompare(String(y.p.fio),"ru") });
+  out.sort(function(x,y){
+    if(x.off!==y.off) return x.off-y.off;
+    return String(x.p.fio).localeCompare(String(y.p.fio),"ru");
   });
-  BDLIST=byDay;
+  BDLIST=out;
   el("bdNote").textContent = "— ближайшие "+BD_DAYS+" дней · действующие"+
-    (F.co ? " · "+F.co : "")+" · "+(total ? n(total)+" "+plurPeople(total) : "никого");
+    (F.co ? " · "+F.co : "")+" · "+(out.length ? n(out.length)+" "+plurPeople(out.length) : "никого");
 
-  if(!total){
-    box.innerHTML='<div class="card"><h3>Именинников нет</h3>'+
-      '<p class="hint">В ближайшие '+BD_DAYS+' дней дней рождения не будет'+
+  if(!out.length){
+    box.innerHTML='<div class="card"><h3>Дни рождения</h3>'+
+      '<p class="hint">В ближайшие '+BD_DAYS+' дней именинников нет'+
       (F.co? " в компании «"+esc(F.co)+"»" : "")+'.</p></div>';
     return;
   }
-  /* выбранный день сохраняем между перерисовками; если там пусто — ближайший непустой */
-  if(BD_SEL>=BD_DAYS || !byDay[BD_SEL].length){
-    BD_SEL=0;
-    for(i=0;i<BD_DAYS;i++) if(byDay[i].length){ BD_SEL=i; break }
-  }
-  var tabs=byDay.map(function(a,k){
-    var d=dts[k];
-    var lbl = k===0 ? "сегодня" : (k===1 ? "завтра" : WDS[d.getDay()]+" "+d.getDate()+"."+
-              String(d.getMonth()+1).padStart(2,"0"));
-    return '<button class="bdtab'+(k===BD_SEL?" on":"")+(a.length?"":" zero")+
-      '" data-d="'+k+'"'+(a.length?"":" disabled")+'>'+lbl+' <b>'+a.length+'</b></button>';
-  }).join("");
-  var sel=byDay[BD_SEL], sd=dts[BD_SEL];
-  var head = (BD_SEL===0 ? "Сегодня" : BD_SEL===1 ? "Завтра"
-              : WD[sd.getDay()].charAt(0).toUpperCase()+WD[sd.getDay()].slice(1))+
-             ", "+sd.getDate()+" "+MONR[sd.getMonth()];
-  var rows=sel.map(function(r,ix){
-    return '<button class="fbar" data-b="'+ix+'" title="'+esc(r.p.fio)+
-      (r.p.co?" · "+esc(r.p.co):"")+'">'+
-      '<span class="bdname">'+esc(r.p.fio)+'</span>'+
-      '<span class="bdage">'+r.age+" "+plurYears(r.age)+'</span></button>';
-  }).join("");
-  box.innerHTML='<div class="card bdcard span2"><h3>'+esc(head)+'</h3>'+
-    '<p class="hint">Клик по имени — карточка сотрудника.</p>'+
-    '<div class="bdtabs">'+tabs+'</div>'+
-    '<p class="day">'+n(sel.length)+" "+plurPeople(sel.length)+'</p>'+
-    '<div class="fbars">'+rows+'</div></div>';
+  if(BD_I>=out.length || BD_I<0) BD_I=0;
+  var r=out[BD_I], d=r.d;
+  var when = r.off===0 ? "сегодня" : (r.off===1 ? "завтра"
+             : WDS[d.getDay()]+", "+d.getDate()+" "+MONS[d.getMonth()]);
+  var co = F.co ? "" : (coMain(r.p) ? " · "+coMain(r.p) : "");
+  box.innerHTML='<div class="card bdcard"><h3>Дни рождения</h3>'+
+    '<p class="hint">Клик по строке — следующий именинник.</p>'+
+    '<button class="bdone'+(r.off===0?" today":"")+'" id="bdOne" title="'+esc(r.p.fio)+'">'+
+      '<span class="nm">'+esc(r.p.fio)+
+        '<span class="sub">'+esc(when+co)+'</span></span>'+
+      '<span class="ag">'+r.age+" "+plurYears(r.age)+'</span></button>'+
+    '<div class="bdnav">'+
+      '<button data-nav="-1" title="Предыдущий" aria-label="Предыдущий">‹</button>'+
+      '<button data-nav="1" title="Следующий" aria-label="Следующий">›</button>'+
+      '<span class="pos">'+(BD_I+1)+' / '+out.length+'</span>'+
+      '<button class="open" data-open="1">Карточка</button>'+
+    '</div></div>';
 }
 function plurPeople(k){ var a=k%100, b=a%10;
   return (a>10&&a<20)?"человек":(b===1?"человек":(b>1&&b<5?"человека":"человек")) }
 function plurYears(k){ var a=k%100, b=a%10;
   return (a>10&&a<20)?"лет":(b===1?"год":(b>1&&b<5?"года":"лет")) }
+function bdStep(k){
+  if(!BDLIST.length) return;
+  BD_I=(BD_I+k+BDLIST.length)%BDLIST.length;   /* по кругу */
+  bdays();
+}
 el("bdBox").addEventListener("click",function(e){
-  var t=e.target.closest(".bdtab");
-  if(t && !t.disabled){ BD_SEL=+t.dataset.d; bdays(); return }
-  var b=e.target.closest(".fbar"); if(!b) return;
-  var r=BDLIST[BD_SEL][+b.dataset.b]; if(r) openCard(r.p, F.co||null);
+  var nav=e.target.closest("[data-nav]");
+  if(nav){ bdStep(+nav.dataset.nav); return }
+  if(e.target.closest("[data-open]")){
+    var r=BDLIST[BD_I]; if(r) openCard(r.p, F.co||null);
+    return;
+  }
+  if(e.target.closest(".bdone")) bdStep(1);
 });
 
 /* --- KPI --- */
