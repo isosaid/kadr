@@ -3389,7 +3389,7 @@ function login(email,hash,save){
   CUR={email:email, admin:!!u.a, hash:hash};
   if(save) logLogin(email,u.a,hash);     /* пишем только реальный вход, не восстановление вкладки */
   box.classList.add("off"); box.setAttribute("aria-hidden","true");
-  if(window.__setUser) window.__setUser({email:email, admin:!!u.a, companies:u.c||[]});
+  if(window.__setUser) window.__setUser({email:email, admin:!!u.a, companies:u.c||[], hash:hash})  /* хэш нужен серверу: /api/data и /api/employees проверяют вход по нему */;
   return true;
 }
 document.getElementById("authForm").addEventListener("submit",function(e){
