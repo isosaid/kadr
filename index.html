@@ -121,6 +121,8 @@ body{
 @media(max-width:760px){.card.span2{grid-column:span 1}}
 .card h3{margin:0 0 3px;font-size:12.5px;font-weight:650}
 .card .hint{margin:0 0 10px;font-size:11px;color:var(--ink3)}
+.pie-note{margin:12px 0 0;padding-top:10px;border-top:1px dashed var(--line,#e2e6ea);font-size:11px;line-height:1.45;color:var(--ink3)}
+.pie-note b{color:var(--ink,#16202B);font-weight:600}
 
 /* ---------- горизонтальные бары (без наложений) ---------- */
 .bars{display:flex;flex-direction:column;gap:2px}
@@ -1827,6 +1829,24 @@ function countCompanies(list){ var m={},i,j,a,p;
       m[a[j]]=(m[a[j]]||0)+1 }
   }
   return Object.keys(m).map(function(k){return[k,m[k]]}).sort(function(a,b){return b[1]-a[1]}) }
+/* Сумма по компаниям больше числа людей, когда человек числится в двух компаниях:
+   в «Доле компаний» он учтён в каждой. Поясняем разницу под кругом. */
+function coOverlapNote(list,rows){
+  if(F.co) return "";                              /* выбрана одна компания — пересечений нет */
+  var sum=0,i,j,a,p,k,people=0;
+  for(i=0;i<rows.length;i++) sum+=rows[i][1];
+  for(i=0;i<list.length;i++){ p=list[i]; a=cos(p); k=0;
+    if(!a.length){ if(F.act===""||F.act==="2") k=1 }
+    else for(j=0;j<a.length;j++) if(F.act==="" || String(stAt(p,a[j]))===F.act) k++;
+    if(k) people++;
+  }
+  var d=sum-people;
+  if(d<=0) return "";
+  var head="Сумма по компаниям — <b>"+n(sum)+"</b>, людей — <b>"+n(people)+"</b>, разница <b>"+n(d)+"</b>. ";
+  if(F.act==="1") return head+"Столько человек сейчас работают сразу в нескольких компаниях холдинга и учтены в каждой. "+
+         "Часть из них может быть незакрытым переводом — стоит сверить с кадровиками.";
+  return head+"Человек, работавший в нескольких компаниях холдинга (в разное время или одновременно), учтён в каждой из них.";
+}
 function orderBy(list,fn,order){ var m={},i,k; for(i=0;i<list.length;i++){ k=fn(list[i]); if(k==null) continue; m[k]=(m[k]||0)+1 }
   return order.filter(function(o){return m[o]}).map(function(o){return[o,m[o]]}) }
 
@@ -1928,7 +1948,8 @@ function pieCard(title,key,rows,opt){
     (picked?'<p class="picked">Выбрано: '+esc(picked)+
        (rows.some(function(r){return r[0]===picked})?'':' — здесь никого нет')+'</p>':'')+
     '<div class="pie-wrap"><svg width="'+S+'" height="'+S+'" viewBox="0 0 '+S+' '+S+'">'+svg.join("")+'</svg>'+
-    '<div class="legend'+(opt.scroll?" scroll":"")+'">'+leg+'</div></div></div>';
+    '<div class="legend'+(opt.scroll?" scroll":"")+'">'+leg+'</div></div>'+
+    (opt.foot?'<p class="pie-note">'+opt.foot+'</p>':'')+'</div>';
 }
 
 /* ============ дашборд компании ============ */
@@ -1976,7 +1997,8 @@ function dashCo(){
   var coSrc=countCompanies(sel("co,act"));
   g.push(chartCard("Компании","co",coSrc,0,false,
     "Все компании. Статус учитывается по каждой компании отдельно.",true));
-  g.push(pieCard("Доля компаний","co",coSrc,{limit:9999,donut:true,sub:"чел.",scroll:true}));
+  g.push(pieCard("Доля компаний","co",coSrc,{limit:9999,donut:true,sub:"чел.",scroll:true,
+                 foot:coOverlapNote(sel("co,act"),coSrc)}));
   el("dashCo").innerHTML=g.filter(Boolean).join("");
   if(F.co) scrollToPicked(el("dashCo"));
 }
