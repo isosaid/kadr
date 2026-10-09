@@ -1843,9 +1843,8 @@ function coOverlapNote(list,rows){
   var d=sum-people;
   if(d<=0) return "";
   var head="Сумма по компаниям — <b>"+n(sum)+"</b>, людей — <b>"+n(people)+"</b>, разница <b>"+n(d)+"</b>. ";
-  if(F.act==="1") return head+"Столько человек сейчас работают сразу в нескольких компаниях холдинга и учтены в каждой. "+
-         "Часть из них может быть незакрытым переводом — стоит сверить с кадровиками.";
-  return head+"Человек, работавший в нескольких компаниях холдинга (в разное время или одновременно), учтён в каждой из них.";
+  if(F.act==="1") return head+"Столько человек сейчас работают сразу в нескольких компаниях холдинга.";
+  return head+"Столько человек работали в нескольких компаниях холдинга — в разное время или одновременно.";
 }
 function orderBy(list,fn,order){ var m={},i,k; for(i=0;i<list.length;i++){ k=fn(list[i]); if(k==null) continue; m[k]=(m[k]||0)+1 }
   return order.filter(function(o){return m[o]}).map(function(o){return[o,m[o]]}) }
