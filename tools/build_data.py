@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Сборка payload дашборда «HR аналитика» из журнала событий (лист «Данные»).
 Одна строка = одно кадровое событие (Дата, Рӯйдод = Қабул/Хориҷ, ЛОИҲА, ...).
-Запуск: python3 build_new.py <main.xlsx> <out.json> <REF YYYY-MM-DD> <source-name>
+Запуск: python3 build_data.py <main.xlsx> <out.json> <REF YYYY-MM-DD> <source-name> [known_cos.json] [merges.json]
 События позже REF отбрасываются («по состоянию на REF»)."""
 import openpyxl, json, io, re, sys, hashlib, datetime as dt, collections, calendar
 
@@ -105,6 +105,25 @@ for r in raw_rows:
         "pos": txt(cell(r, "ВАЗИФА")), "un": txt(cell(r, "СОХТОР")), "mgr": txt(cell(r, "САРДОРИ БЕВОСИТА")),
         "cat": txt(cell(r, "КАТЕГОРИЯ")), "ctr": txt(cell(r, "ТИП")), "tab": txt(cell(r, "РАҚАМИ ТАБЕЛӢ")),
         "rsn": txt(cell(r, "САБАБИ АЗ КОР РАФТАН"))})
+
+# ---- одноразовые объединения дублей (tools/merges.json) ------------------
+# Правило «кто есть кто» не меняется: профиль, ошибочно введённый кадровиками
+# под другим написанием, вливается в выбранный. Нет цели в данных — строка молча
+# пропускается (значит, источник уже исправлен).
+MERGED = 0
+if len(sys.argv) > 6:
+    M = json.load(io.open(sys.argv[6], encoding="utf-8")).get("merge", {})
+    pid = lambda k: hashlib.sha1(k.encode()).hexdigest()[:10]
+    by_id = {pid(k): k for k in groups}
+    for src, dst in M.items():
+        ks, kd = by_id.get(src), by_id.get(dst)
+        if not ks or not kd or ks == kd: continue
+        gs, gd = groups.pop(ks), groups[kd]
+        gd["rows"].extend(gs["rows"])
+        gd["rows"].sort(key=lambda x: x["d"] or "9999")
+        gd["gen"] = gd["gen"] or gs["gen"]; gd["nat"] = gd["nat"] or gs["nat"]
+        MERGED += 1
+    stat["объединено дублей"] = MERGED
 
 DICT, DIDX = [], {}
 def di(v):
